@@ -1,3 +1,4 @@
+export * from './demo-game'
 export * from './model'
 export * from './participants'
 export * from './rules'

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { type PersistedGameState, restorePersistedGameState } from './persisted-state'
+import {
+  type PersistedGameState,
+  migratePersistedGameState,
+  restorePersistedGameState,
+} from './persisted-state'
 
 const fallbackState: PersistedGameState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   mode: 'individual',
   participants: [
     { type: 'individual', id: 'player-1', name: 'Анна' },
@@ -13,6 +17,10 @@ const fallbackState: PersistedGameState = {
   status: 'draft',
   roundIndex: 0,
   phase: 'setup',
+  usedQuestionIds: [],
+  activeQuestion: null,
+  selectorParticipantId: null,
+  history: [],
 }
 
 describe('restorePersistedGameState', () => {
@@ -32,5 +40,25 @@ describe('restorePersistedGameState', () => {
     expect(
       restorePersistedGameState({ schemaVersion: 99, scores: 'broken' }, fallbackState),
     ).toEqual(fallbackState)
+  })
+
+  it('migrates a version 1 session without losing scores or the round', () => {
+    const legacyState = {
+      schemaVersion: 1,
+      mode: 'individual',
+      participants: fallbackState.participants,
+      scores: { 'player-1': 500, 'player-2': -100 },
+      status: 'active',
+      roundIndex: 1,
+      phase: 'board',
+    }
+
+    expect(migratePersistedGameState(legacyState, 1)).toMatchObject({
+      schemaVersion: 2,
+      scores: legacyState.scores,
+      roundIndex: 1,
+      usedQuestionIds: [],
+      history: [],
+    })
   })
 })

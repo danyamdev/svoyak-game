@@ -229,6 +229,23 @@
   border: 0.14rem solid var(--color-orange-light);
   box-shadow: 0 0.24rem 0 rgb(255 122 0 / 50%);
   opacity: 1;
+
+  &:not(:disabled):hover {
+    translate: 0 -0.16rem;
+    box-shadow: 0 0.4rem 0 rgb(255 122 0 / 65%);
+  }
+
+  &:focus-visible {
+    outline: 0.2rem solid var(--color-cyan);
+    outline-offset: 0.16rem;
+  }
+}
+
+.usedQuestion {
+  color: rgb(255 243 214 / 28%);
+  background: rgb(255 255 255 / 5%);
+  border-color: rgb(255 255 255 / 8%);
+  box-shadow: none;
 }
 
 .nextStepNote {
