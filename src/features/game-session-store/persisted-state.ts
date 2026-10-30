@@ -40,7 +40,7 @@ const activeQuestionSchema = z.object({
 const runtimeSnapshotSchema = z.object({
   scores: z.record(z.string(), z.number().int()),
   roundIndex: z.number().int().min(0).max(2),
-  phase: z.enum(['board', 'question', 'judging', 'answerReveal']),
+  phase: z.enum(['board', 'question', 'judging', 'answerReveal', 'roundComplete']),
   usedQuestionIds: z.array(z.string().min(1)),
   activeQuestion: activeQuestionSchema.nullable(),
   selectorParticipantId: z.string().min(1).nullable(),
@@ -53,7 +53,7 @@ export const persistedGameStateSchema = z.object({
   scores: z.record(z.string(), z.number().int()),
   status: z.enum(['draft', 'active']),
   roundIndex: z.number().int().min(0).max(2),
-  phase: z.enum(['setup', 'board', 'question', 'judging', 'answerReveal']),
+  phase: z.enum(['setup', 'board', 'question', 'judging', 'answerReveal', 'roundComplete']),
   usedQuestionIds: z.array(z.string().min(1)),
   activeQuestion: activeQuestionSchema.nullable(),
   selectorParticipantId: z.string().min(1).nullable(),

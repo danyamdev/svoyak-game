@@ -143,28 +143,8 @@
 }
 
 .roundControls {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 1rem;
-  align-items: center;
   width: min(100%, 28rem);
   margin: -2.8rem auto 1.25rem;
-
-  > button {
-    display: grid;
-    width: 2.8rem;
-    height: 2.8rem;
-    font-size: 1.2rem;
-    color: var(--color-cream);
-    background: var(--color-purple);
-    border: 0.12rem solid rgb(255 255 255 / 18%);
-    border-radius: 50%;
-    place-items: center;
-
-    &:disabled {
-      opacity: 0.3;
-    }
-  }
 
   div {
     padding: 0.65rem 1.5rem;

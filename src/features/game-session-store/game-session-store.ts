@@ -1,7 +1,13 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
-import { participantsSchema } from '../../domain/game'
+import {
+  DEMO_ROUNDS,
+  type GameCommand,
+  type GameRuntimeState,
+  participantsSchema,
+  transitionGame,
+} from '../../domain/game'
 import {
   type GameMode,
   type ParticipantDraft,
@@ -53,7 +59,7 @@ function createInitialState(mode: GameMode = 'individual'): PersistedGameState {
   }
 }
 
-function createRuntimeSnapshot(state: GameSessionStore): RuntimeSnapshot {
+function toRuntimeState(state: GameSessionStore): GameRuntimeState {
   return {
     scores: state.scores,
     roundIndex: state.roundIndex,
@@ -62,6 +68,10 @@ function createRuntimeSnapshot(state: GameSessionStore): RuntimeSnapshot {
     activeQuestion: state.activeQuestion,
     selectorParticipantId: state.selectorParticipantId,
   }
+}
+
+function createRuntimeSnapshot(state: GameSessionStore): RuntimeSnapshot {
+  return toRuntimeState(state)
 }
 
 function appendHistory(state: GameSessionStore) {
@@ -84,13 +94,13 @@ interface GameSessionActions {
   renameTeamMember: (teamId: string, memberId: string, name: string) => void
   startSession: () => StartSessionResult
   changeScore: (participantId: string, delta: number) => void
-  setRoundIndex: (roundIndex: number) => void
   selectQuestion: (questionId: string, price: number) => void
   chooseAnswerer: (participantId: string) => void
   markCorrect: () => void
   markIncorrect: () => void
   skipQuestion: () => void
   continueAfterAnswer: () => void
+  advanceRound: () => void
   undo: () => void
   resetSession: () => void
 }
@@ -101,222 +111,139 @@ const initialState = createInitialState()
 
 export const useGameSessionStore = create<GameSessionStore>()(
   persist(
-    (set, get) => ({
-      ...initialState,
-      setMode: (mode) => set(createInitialState(mode)),
-      addParticipant: () => {
-        const { mode, participants } = get()
-        if (participants.length >= MAX_PARTICIPANTS) return
+    (set, get) => {
+      function dispatch(command: GameCommand) {
+        const state = get()
+        const runtimeState = toRuntimeState(state)
+        const nextRuntimeState = transitionGame(runtimeState, command)
 
-        set({ participants: [...participants, createParticipant(mode, participants.length)] })
-      },
-      removeParticipant: (participantId) => {
-        const { participants } = get()
-        if (participants.length <= 2) return
+        if (nextRuntimeState === runtimeState) return
+        set({ ...nextRuntimeState, history: appendHistory(state) })
+      }
 
-        set({ participants: participants.filter(({ id }) => id !== participantId) })
-      },
-      renameParticipant: (participantId, name) =>
-        set(({ participants }) => ({
-          participants: participants.map((participant) =>
-            participant.id === participantId ? { ...participant, name } : participant,
-          ),
-        })),
-      addTeamMember: (teamId) =>
-        set(({ participants }) => ({
-          participants: participants.map((participant) => {
-            if (participant.type !== 'team' || participant.id !== teamId) return participant
-            if (participant.members.length >= MAX_TEAM_MEMBERS) return participant
+      return {
+        ...initialState,
+        setMode: (mode) => set(createInitialState(mode)),
+        addParticipant: () => {
+          const { mode, participants } = get()
+          if (participants.length >= MAX_PARTICIPANTS) return
 
+          set({ participants: [...participants, createParticipant(mode, participants.length)] })
+        },
+        removeParticipant: (participantId) => {
+          const { participants } = get()
+          if (participants.length <= 2) return
+
+          set({ participants: participants.filter(({ id }) => id !== participantId) })
+        },
+        renameParticipant: (participantId, name) =>
+          set(({ participants }) => ({
+            participants: participants.map((participant) =>
+              participant.id === participantId ? { ...participant, name } : participant,
+            ),
+          })),
+        addTeamMember: (teamId) =>
+          set(({ participants }) => ({
+            participants: participants.map((participant) => {
+              if (participant.type !== 'team' || participant.id !== teamId) return participant
+              if (participant.members.length >= MAX_TEAM_MEMBERS) return participant
+
+              return {
+                ...participant,
+                members: [
+                  ...participant.members,
+                  {
+                    id: createId('member'),
+                    name: `Участник ${participant.members.length + 1}`,
+                  },
+                ],
+              }
+            }),
+          })),
+        removeTeamMember: (teamId, memberId) =>
+          set(({ participants }) => ({
+            participants: participants.map((participant) => {
+              if (participant.type !== 'team' || participant.id !== teamId) return participant
+              if (participant.members.length <= 1) return participant
+
+              return {
+                ...participant,
+                members: participant.members.filter(({ id }) => id !== memberId),
+              }
+            }),
+          })),
+        renameTeamMember: (teamId, memberId, name) =>
+          set(({ participants }) => ({
+            participants: participants.map((participant) => {
+              if (participant.type !== 'team' || participant.id !== teamId) return participant
+
+              return {
+                ...participant,
+                members: participant.members.map((member) =>
+                  member.id === memberId ? { ...member, name } : member,
+                ),
+              }
+            }),
+          })),
+        startSession: () => {
+          const { participants } = get()
+          const result = participantsSchema.safeParse(participants)
+
+          if (!result.success) {
             return {
-              ...participant,
-              members: [
-                ...participant.members,
-                {
-                  id: createId('member'),
-                  name: `Участник ${participant.members.length + 1}`,
-                },
-              ],
+              success: false,
+              message: 'Заполните имена всех игроков, команд и участников',
             }
-          }),
-        })),
-      removeTeamMember: (teamId, memberId) =>
-        set(({ participants }) => ({
-          participants: participants.map((participant) => {
-            if (participant.type !== 'team' || participant.id !== teamId) return participant
-            if (participant.members.length <= 1) return participant
-
-            return {
-              ...participant,
-              members: participant.members.filter(({ id }) => id !== memberId),
-            }
-          }),
-        })),
-      renameTeamMember: (teamId, memberId, name) =>
-        set(({ participants }) => ({
-          participants: participants.map((participant) => {
-            if (participant.type !== 'team' || participant.id !== teamId) return participant
-
-            return {
-              ...participant,
-              members: participant.members.map((member) =>
-                member.id === memberId ? { ...member, name } : member,
-              ),
-            }
-          }),
-        })),
-      startSession: () => {
-        const { participants } = get()
-        const result = participantsSchema.safeParse(participants)
-
-        if (!result.success) {
-          return {
-            success: false,
-            message: 'Заполните имена всех игроков, команд и участников',
           }
-        }
 
-        set({
-          participants: result.data,
-          scores: Object.fromEntries(result.data.map(({ id }) => [id, 0])),
-          status: 'active',
-          phase: 'board',
-          roundIndex: 0,
-          usedQuestionIds: [],
-          activeQuestion: null,
-          selectorParticipantId: result.data[0]?.id ?? null,
-          history: [],
-        })
+          set({
+            participants: result.data,
+            scores: Object.fromEntries(result.data.map(({ id }) => [id, 0])),
+            status: 'active',
+            phase: 'board',
+            roundIndex: 0,
+            usedQuestionIds: [],
+            activeQuestion: null,
+            selectorParticipantId: result.data[0]?.id ?? null,
+            history: [],
+          })
 
-        return { success: true }
-      },
-      changeScore: (participantId, delta) => {
-        if (!Number.isInteger(delta)) return
-
-        set((state) => ({
-          scores: {
-            ...state.scores,
-            [participantId]: (state.scores[participantId] ?? 0) + delta,
-          },
-          history: appendHistory(state),
-        }))
-      },
-      setRoundIndex: (roundIndex) => {
-        const state = get()
-        if (state.phase !== 'board') return
-        if (!Number.isInteger(roundIndex) || roundIndex < 0 || roundIndex > 2) return
-
-        set({ roundIndex, history: appendHistory(state) })
-      },
-      selectQuestion: (questionId, price) => {
-        const state = get()
-        if (state.phase !== 'board' || state.usedQuestionIds.includes(questionId)) return
-        if (!Number.isInteger(price) || price <= 0) return
-
-        set({
-          phase: 'question',
-          activeQuestion: {
+          return { success: true }
+        },
+        changeScore: (participantId, delta) =>
+          dispatch({ type: 'scoreAdjusted', participantId, delta }),
+        selectQuestion: (questionId, price) =>
+          dispatch({
+            type: 'questionSelected',
             questionId,
             price,
-            eligibleParticipantIds: state.participants.map(({ id }) => id),
-            activeParticipantId: null,
-            attempts: [],
-          },
-          history: appendHistory(state),
-        })
-      },
-      chooseAnswerer: (participantId) => {
-        const state = get()
-        if (state.phase !== 'question' || !state.activeQuestion) return
-        if (!state.activeQuestion.eligibleParticipantIds.includes(participantId)) return
+            participantIds: get().participants.map(({ id }) => id),
+          }),
+        chooseAnswerer: (participantId) => dispatch({ type: 'answererChosen', participantId }),
+        markCorrect: () => dispatch({ type: 'answerMarkedCorrect' }),
+        markIncorrect: () => dispatch({ type: 'answerMarkedIncorrect' }),
+        skipQuestion: () => dispatch({ type: 'questionSkipped' }),
+        continueAfterAnswer: () =>
+          dispatch({
+            type: 'answerClosed',
+            roundQuestionIds: DEMO_ROUNDS[get().roundIndex].flatMap(({ questions }) =>
+              questions.map(({ id }) => id),
+            ),
+          }),
+        advanceRound: () => dispatch({ type: 'nextRoundStarted', totalRounds: DEMO_ROUNDS.length }),
+        undo: () => {
+          const state = get()
+          const previousState = state.history.at(-1)
+          if (!previousState) return
 
-        set({
-          phase: 'judging',
-          activeQuestion: { ...state.activeQuestion, activeParticipantId: participantId },
-          history: appendHistory(state),
-        })
-      },
-      markCorrect: () => {
-        const state = get()
-        const question = state.activeQuestion
-        const participantId = question?.activeParticipantId
-        if (state.phase !== 'judging' || !question || !participantId) return
-
-        set({
-          phase: 'answerReveal',
-          scores: {
-            ...state.scores,
-            [participantId]: (state.scores[participantId] ?? 0) + question.price,
-          },
-          selectorParticipantId: participantId,
-          activeQuestion: {
-            ...question,
-            attempts: [
-              ...question.attempts,
-              { participantId, result: 'correct', scoreDelta: question.price },
-            ],
-          },
-          history: appendHistory(state),
-        })
-      },
-      markIncorrect: () => {
-        const state = get()
-        const question = state.activeQuestion
-        const participantId = question?.activeParticipantId
-        if (state.phase !== 'judging' || !question || !participantId) return
-
-        const eligibleParticipantIds = question.eligibleParticipantIds.filter(
-          (id) => id !== participantId,
-        )
-
-        set({
-          // Если отвечать больше некому, сразу показываем правильный ответ.
-          phase: eligibleParticipantIds.length > 0 ? 'question' : 'answerReveal',
-          scores: {
-            ...state.scores,
-            [participantId]: (state.scores[participantId] ?? 0) - question.price,
-          },
-          activeQuestion: {
-            ...question,
-            eligibleParticipantIds,
-            activeParticipantId: null,
-            attempts: [
-              ...question.attempts,
-              { participantId, result: 'incorrect', scoreDelta: -question.price },
-            ],
-          },
-          history: appendHistory(state),
-        })
-      },
-      skipQuestion: () => {
-        const state = get()
-        if (state.phase !== 'question' || !state.activeQuestion) return
-
-        set({ phase: 'answerReveal', history: appendHistory(state) })
-      },
-      continueAfterAnswer: () => {
-        const state = get()
-        if (state.phase !== 'answerReveal' || !state.activeQuestion) return
-
-        set({
-          phase: 'board',
-          usedQuestionIds: [...state.usedQuestionIds, state.activeQuestion.questionId],
-          activeQuestion: null,
-          history: appendHistory(state),
-        })
-      },
-      undo: () => {
-        const state = get()
-        const previousState = state.history.at(-1)
-        if (!previousState) return
-
-        set({
-          ...previousState,
-          history: state.history.slice(0, -1),
-        })
-      },
-      resetSession: () => set(createInitialState(get().mode)),
-    }),
+          set({
+            ...previousState,
+            history: state.history.slice(0, -1),
+          })
+        },
+        resetSession: () => set(createInitialState(get().mode)),
+      }
+    },
     {
       name: STORAGE_KEY,
       version: 2,

@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { DEMO_ROUNDS } from '../../domain/game'
 import { useGameSessionStore } from '../../features/game-session-store'
 import { QuestionPanel } from '../../widgets/question-panel'
+import { RoundCompletePanel } from '../../widgets/round-complete-panel'
 import styles from './game-page.module.scss'
 
 export function GamePage() {
@@ -14,7 +15,6 @@ export function GamePage() {
     phase,
     usedQuestionIds,
     changeScore,
-    setRoundIndex,
     selectQuestion,
   } = useGameSessionStore()
 
@@ -63,24 +63,10 @@ export function GamePage() {
 
       <section className={styles.gameArea}>
         <div className={styles.roundControls}>
-          <button
-            type="button"
-            disabled={roundIndex === 0}
-            onClick={() => setRoundIndex(roundIndex - 1)}
-          >
-            ←
-          </button>
           <div>
             <span>Основная игра</span>
             <h1>Раунд {roundIndex + 1}</h1>
           </div>
-          <button
-            type="button"
-            disabled={roundIndex === 2}
-            onClick={() => setRoundIndex(roundIndex + 1)}
-          >
-            →
-          </button>
         </div>
 
         <div className={styles.board} aria-label={`Игровое поле, раунд ${roundIndex + 1}`}>
@@ -112,6 +98,7 @@ export function GamePage() {
         </p>
       </section>
       <QuestionPanel />
+      <RoundCompletePanel />
     </main>
   )
 }
