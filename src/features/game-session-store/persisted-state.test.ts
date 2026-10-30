@@ -7,7 +7,7 @@ import {
 } from './persisted-state'
 
 const fallbackState: PersistedGameState = {
-  schemaVersion: 2,
+  schemaVersion: 4,
   mode: 'individual',
   participants: [
     { type: 'individual', id: 'player-1', name: 'Анна' },
@@ -54,11 +54,65 @@ describe('restorePersistedGameState', () => {
     }
 
     expect(migratePersistedGameState(legacyState, 1)).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 4,
       scores: legacyState.scores,
       roundIndex: 1,
       usedQuestionIds: [],
       history: [],
+    })
+  })
+
+  it('migrates a version 2 question in progress as a regular question', () => {
+    const legacyState = {
+      ...fallbackState,
+      schemaVersion: 2,
+      status: 'active',
+      phase: 'question',
+      activeQuestion: {
+        questionId: 'question-1',
+        price: 300,
+        eligibleParticipantIds: ['player-1', 'player-2'],
+        activeParticipantId: null,
+        attempts: [],
+      },
+    }
+
+    expect(migratePersistedGameState(legacyState, 2)).toMatchObject({
+      schemaVersion: 4,
+      activeQuestion: {
+        questionId: 'question-1',
+        type: 'regular',
+        catPriceOptions: null,
+        auctionBidRange: null,
+      },
+    })
+  })
+
+  it('migrates a version 3 cat setup without losing its recipient', () => {
+    const legacyState = {
+      ...fallbackState,
+      schemaVersion: 3,
+      status: 'active',
+      phase: 'catSetup',
+      activeQuestion: {
+        questionId: 'cat-1',
+        type: 'cat',
+        price: 300,
+        catPriceOptions: [100, 500],
+        eligibleParticipantIds: ['player-1', 'player-2'],
+        activeParticipantId: 'player-2',
+        attempts: [],
+      },
+    }
+
+    expect(migratePersistedGameState(legacyState, 3)).toMatchObject({
+      schemaVersion: 4,
+      phase: 'catSetup',
+      activeQuestion: {
+        type: 'cat',
+        activeParticipantId: 'player-2',
+        auctionBidRange: null,
+      },
     })
   })
 })

@@ -2,9 +2,11 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import {
-  DEMO_ROUNDS,
+  DEFAULT_GAME_DEFINITION,
   type GameCommand,
   type GameRuntimeState,
+  findGameQuestion,
+  getCatPrices,
   participantsSchema,
   transitionGame,
 } from '../../domain/game'
@@ -45,7 +47,7 @@ function createParticipant(mode: GameMode, index: number): ParticipantDraft {
 
 function createInitialState(mode: GameMode = 'individual'): PersistedGameState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 4,
     mode,
     participants: [createParticipant(mode, 0), createParticipant(mode, 1)],
     scores: {},
@@ -94,7 +96,11 @@ interface GameSessionActions {
   renameTeamMember: (teamId: string, memberId: string, name: string) => void
   startSession: () => StartSessionResult
   changeScore: (participantId: string, delta: number) => void
-  selectQuestion: (questionId: string, price: number) => void
+  selectQuestion: (questionId: string) => void
+  chooseCatRecipient: (participantId: string) => void
+  chooseCatPrice: (price: number) => void
+  chooseAuctionWinner: (participantId: string) => void
+  chooseAuctionBid: (bid: number) => void
   chooseAnswerer: (participantId: string) => void
   markCorrect: () => void
   markIncorrect: () => void
@@ -212,13 +218,28 @@ export const useGameSessionStore = create<GameSessionStore>()(
         },
         changeScore: (participantId, delta) =>
           dispatch({ type: 'scoreAdjusted', participantId, delta }),
-        selectQuestion: (questionId, price) =>
+        selectQuestion: (questionId) => {
+          const lookup = findGameQuestion(questionId)
+          if (!lookup) return
+
           dispatch({
             type: 'questionSelected',
             questionId,
-            price,
+            questionType: lookup.question.type,
+            price: lookup.question.price,
+            catPriceOptions:
+              lookup.question.type === 'cat'
+                ? ([...getCatPrices(get().roundIndex)] as [number, number])
+                : null,
             participantIds: get().participants.map(({ id }) => id),
-          }),
+          })
+        },
+        chooseCatRecipient: (participantId) =>
+          dispatch({ type: 'catRecipientChosen', participantId }),
+        chooseCatPrice: (price) => dispatch({ type: 'catPriceChosen', price }),
+        chooseAuctionWinner: (participantId) =>
+          dispatch({ type: 'auctionWinnerChosen', participantId }),
+        chooseAuctionBid: (bid) => dispatch({ type: 'auctionBidChosen', bid }),
         chooseAnswerer: (participantId) => dispatch({ type: 'answererChosen', participantId }),
         markCorrect: () => dispatch({ type: 'answerMarkedCorrect' }),
         markIncorrect: () => dispatch({ type: 'answerMarkedIncorrect' }),
@@ -226,11 +247,15 @@ export const useGameSessionStore = create<GameSessionStore>()(
         continueAfterAnswer: () =>
           dispatch({
             type: 'answerClosed',
-            roundQuestionIds: DEMO_ROUNDS[get().roundIndex].flatMap(({ questions }) =>
-              questions.map(({ id }) => id),
+            roundQuestionIds: DEFAULT_GAME_DEFINITION.rounds[get().roundIndex].categories.flatMap(
+              ({ questions }) => questions.map(({ id }) => id),
             ),
           }),
-        advanceRound: () => dispatch({ type: 'nextRoundStarted', totalRounds: DEMO_ROUNDS.length }),
+        advanceRound: () =>
+          dispatch({
+            type: 'nextRoundStarted',
+            totalRounds: DEFAULT_GAME_DEFINITION.rounds.length,
+          }),
         undo: () => {
           const state = get()
           const previousState = state.history.at(-1)
@@ -246,7 +271,7 @@ export const useGameSessionStore = create<GameSessionStore>()(
     },
     {
       name: STORAGE_KEY,
-      version: 2,
+      version: 4,
       storage: createJSONStorage(() => localStorage),
       migrate: migratePersistedGameState,
       partialize: ({

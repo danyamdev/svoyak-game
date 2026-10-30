@@ -130,6 +130,111 @@
   }
 }
 
+.catSetup,
+.auctionSetup {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+  text-align: center;
+  background: linear-gradient(145deg, rgb(255 122 0 / 16%), rgb(185 242 39 / 8%));
+  border: 0.12rem solid rgb(255 177 82 / 38%);
+  border-radius: 1rem;
+
+  p {
+    margin: 0;
+  }
+}
+
+.catOptions,
+.auctionOptions,
+.priceOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.65rem;
+
+  button {
+    min-height: 3.4rem;
+    padding: 0.7rem;
+    font-family: var(--font-display);
+    font-weight: 900;
+    color: var(--color-ink);
+    background: var(--color-orange-light);
+    border: 0;
+    border-radius: 0.75rem;
+
+    span {
+      display: block;
+      margin-top: 0.2rem;
+      font-family: var(--font-body);
+      font-size: 0.7rem;
+    }
+
+    &:hover {
+      translate: 0 -0.1rem;
+    }
+
+    &:focus-visible {
+      outline: 0.2rem solid var(--color-cyan);
+      outline-offset: 0.15rem;
+    }
+  }
+}
+
+.bidForm {
+  display: grid;
+  gap: 0.5rem;
+
+  label {
+    font-size: 0.78rem;
+    color: rgb(255 243 214 / 70%);
+  }
+
+  > div {
+    display: grid;
+    grid-template-columns: minmax(7rem, 0.6fr) minmax(10rem, 1fr);
+    gap: 0.65rem;
+    width: min(100%, 25rem);
+    margin: 0 auto;
+  }
+
+  input,
+  button {
+    min-height: 3rem;
+    padding: 0.65rem;
+    font-weight: 900;
+    border-radius: 0.7rem;
+  }
+
+  input {
+    width: 100%;
+    color: var(--color-ink);
+    background: var(--color-cream);
+    border: 0.12rem solid var(--color-orange-light);
+  }
+
+  button {
+    color: var(--color-ink);
+    background: var(--color-lime);
+    border: 0;
+  }
+
+  input:focus-visible,
+  button:focus-visible {
+    outline: 0.2rem solid var(--color-cyan);
+    outline-offset: 0.15rem;
+  }
+}
+
+.priceOptions {
+  grid-template-columns: repeat(2, minmax(0, 10rem));
+  justify-content: center;
+
+  button {
+    font-size: 1.25rem;
+    background: var(--color-lime);
+  }
+}
+
 .skipButton {
   justify-self: center;
   padding: 0.65rem 0.9rem;
@@ -261,5 +366,9 @@
   .questionContent {
     min-height: 10rem;
     padding-block: 1.5rem;
+  }
+
+  .bidForm > div {
+    grid-template-columns: 1fr;
   }
 }

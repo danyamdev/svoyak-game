@@ -1,4 +1,14 @@
-export type RuntimePhase = 'board' | 'question' | 'judging' | 'answerReveal' | 'roundComplete'
+import { getAuctionBidRange } from '../rules'
+
+export type RuntimePhase =
+  'board' | 'catSetup' | 'auctionSetup' | 'question' | 'judging' | 'answerReveal' | 'roundComplete'
+
+export type RuntimeQuestionType = 'regular' | 'cat' | 'auction'
+
+export interface RuntimeBidRange {
+  minimum: number
+  maximum: number
+}
 
 export interface AnswerAttempt {
   participantId: string
@@ -8,7 +18,10 @@ export interface AnswerAttempt {
 
 export interface ActiveQuestionState {
   questionId: string
+  type: RuntimeQuestionType
   price: number
+  catPriceOptions: [number, number] | null
+  auctionBidRange: RuntimeBidRange | null
   eligibleParticipantIds: string[]
   activeParticipantId: string | null
   attempts: AnswerAttempt[]
@@ -25,7 +38,18 @@ export interface GameRuntimeState {
 
 export type GameCommand =
   | { type: 'scoreAdjusted'; participantId: string; delta: number }
-  | { type: 'questionSelected'; questionId: string; price: number; participantIds: string[] }
+  | {
+      type: 'questionSelected'
+      questionId: string
+      questionType: RuntimeQuestionType
+      price: number
+      catPriceOptions: [number, number] | null
+      participantIds: string[]
+    }
+  | { type: 'catRecipientChosen'; participantId: string }
+  | { type: 'catPriceChosen'; price: number }
+  | { type: 'auctionWinnerChosen'; participantId: string }
+  | { type: 'auctionBidChosen'; bid: number }
   | { type: 'answererChosen'; participantId: string }
   | { type: 'answerMarkedCorrect' }
   | { type: 'answerMarkedIncorrect' }
@@ -42,7 +66,22 @@ export function transitionGame(state: GameRuntimeState, command: GameCommand): G
     case 'scoreAdjusted':
       return adjustScore(state, command.participantId, command.delta)
     case 'questionSelected':
-      return selectQuestion(state, command.questionId, command.price, command.participantIds)
+      return selectQuestion(
+        state,
+        command.questionId,
+        command.questionType,
+        command.price,
+        command.catPriceOptions,
+        command.participantIds,
+      )
+    case 'catRecipientChosen':
+      return chooseCatRecipient(state, command.participantId)
+    case 'catPriceChosen':
+      return chooseCatPrice(state, command.price)
+    case 'auctionWinnerChosen':
+      return chooseAuctionWinner(state, command.participantId)
+    case 'auctionBidChosen':
+      return chooseAuctionBid(state, command.bid)
     case 'answererChosen':
       return chooseAnswerer(state, command.participantId)
     case 'answerMarkedCorrect':
@@ -73,7 +112,9 @@ function adjustScore(state: GameRuntimeState, participantId: string, delta: numb
 function selectQuestion(
   state: GameRuntimeState,
   questionId: string,
+  questionType: RuntimeQuestionType,
   price: number,
+  catPriceOptions: [number, number] | null,
   participantIds: string[],
 ) {
   if (state.phase !== 'board' || state.usedQuestionIds.includes(questionId)) return state
@@ -81,13 +122,86 @@ function selectQuestion(
 
   return {
     ...state,
-    phase: 'question' as const,
+    phase:
+      questionType === 'cat'
+        ? ('catSetup' as const)
+        : questionType === 'auction'
+          ? ('auctionSetup' as const)
+          : ('question' as const),
     activeQuestion: {
       questionId,
+      type: questionType,
       price,
+      catPriceOptions,
+      auctionBidRange: null,
       eligibleParticipantIds: participantIds,
       activeParticipantId: null,
       attempts: [],
+    },
+  }
+}
+
+function chooseAuctionWinner(state: GameRuntimeState, participantId: string) {
+  const question = state.activeQuestion
+  if (state.phase !== 'auctionSetup' || question?.type !== 'auction') return state
+  if (!question.eligibleParticipantIds.includes(participantId)) return state
+
+  const score = state.scores[participantId] ?? 0
+  const { minimum, maximum } = getAuctionBidRange(score, question.price)
+
+  return {
+    ...state,
+    activeQuestion: {
+      ...question,
+      activeParticipantId: participantId,
+      auctionBidRange: { minimum, maximum },
+    },
+  }
+}
+
+function chooseAuctionBid(state: GameRuntimeState, bid: number) {
+  const question = state.activeQuestion
+  const participantId = question?.activeParticipantId
+  const range = question?.auctionBidRange
+  if (state.phase !== 'auctionSetup' || question?.type !== 'auction') return state
+  if (!participantId || !range || !Number.isInteger(bid)) return state
+  if (bid < range.minimum || bid > range.maximum) return state
+
+  return {
+    ...state,
+    phase: 'judging' as const,
+    activeQuestion: {
+      ...question,
+      price: bid,
+      eligibleParticipantIds: [participantId],
+    },
+  }
+}
+
+function chooseCatRecipient(state: GameRuntimeState, participantId: string) {
+  const question = state.activeQuestion
+  if (state.phase !== 'catSetup' || question?.type !== 'cat') return state
+  if (!question.eligibleParticipantIds.includes(participantId)) return state
+
+  return {
+    ...state,
+    activeQuestion: { ...question, activeParticipantId: participantId },
+  }
+}
+
+function chooseCatPrice(state: GameRuntimeState, price: number) {
+  const question = state.activeQuestion
+  const participantId = question?.activeParticipantId
+  if (state.phase !== 'catSetup' || question?.type !== 'cat' || !participantId) return state
+  if (!question.catPriceOptions?.includes(price)) return state
+
+  return {
+    ...state,
+    phase: 'judging' as const,
+    activeQuestion: {
+      ...question,
+      price,
+      eligibleParticipantIds: [participantId],
     },
   }
 }

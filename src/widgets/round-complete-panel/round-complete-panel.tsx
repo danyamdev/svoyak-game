@@ -1,6 +1,6 @@
 import { Dialog } from 'radix-ui'
 
-import { DEMO_ROUNDS } from '../../domain/game'
+import { DEFAULT_GAME_DEFINITION } from '../../domain/game'
 import { useGameSessionStore } from '../../features/game-session-store'
 import styles from './round-complete-panel.module.scss'
 
@@ -13,7 +13,7 @@ export function RoundCompletePanel() {
   const leaderboard = [...participants].sort(
     (first, second) => (scores[second.id] ?? 0) - (scores[first.id] ?? 0),
   )
-  const hasNextRound = roundIndex + 1 < DEMO_ROUNDS.length
+  const hasNextRound = roundIndex + 1 < DEFAULT_GAME_DEFINITION.rounds.length
 
   return (
     <Dialog.Root open>

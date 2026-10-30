@@ -1,6 +1,7 @@
+import type { FormEvent } from 'react'
 import { Dialog } from 'radix-ui'
 
-import { findDemoQuestion } from '../../domain/game'
+import { findGameQuestion, getContentText } from '../../domain/game'
 import { useGameSessionStore } from '../../features/game-session-store'
 import styles from './question-panel.module.scss'
 
@@ -8,8 +9,13 @@ export function QuestionPanel() {
   const {
     phase,
     participants,
+    scores,
     activeQuestion,
     history,
+    chooseCatRecipient,
+    chooseCatPrice,
+    chooseAuctionWinner,
+    chooseAuctionBid,
     chooseAnswerer,
     markCorrect,
     markIncorrect,
@@ -20,10 +26,21 @@ export function QuestionPanel() {
 
   if (!activeQuestion || phase === 'board' || phase === 'setup') return null
 
-  const question = findDemoQuestion(activeQuestion.questionId)
-  if (!question) return null
+  const lookup = findGameQuestion(activeQuestion.questionId)
+  if (!lookup) return null
 
   const activeParticipant = participants.find(({ id }) => id === activeQuestion.activeParticipantId)
+  const prompt = getContentText(lookup.question.prompt)
+  const answer = getContentText(lookup.question.answer)
+  const isCatSetup = phase === 'catSetup' && activeQuestion.type === 'cat'
+  const isAuctionSetup = phase === 'auctionSetup' && activeQuestion.type === 'auction'
+  const isSpecialSetup = isCatSetup || isAuctionSetup
+
+  function submitAuctionBid(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const bid = Number(new FormData(event.currentTarget).get('auctionBid'))
+    chooseAuctionBid(bid)
+  }
 
   return (
     <Dialog.Root open>
@@ -37,8 +54,10 @@ export function QuestionPanel() {
         >
           <header className={styles.header}>
             <div>
-              <span>{question.category}</span>
-              <strong>{question.price}</strong>
+              <span>{lookup.categoryTitle}</span>
+              <strong>
+                {isCatSetup ? 'Кот' : isAuctionSetup ? 'Аукцион' : activeQuestion.price}
+              </strong>
             </div>
             <button type="button" disabled={history.length === 0} onClick={undo}>
               ↶ Отменить действие
@@ -46,13 +65,102 @@ export function QuestionPanel() {
           </header>
 
           <div className={styles.questionContent}>
-            <Dialog.Title>{question.prompt}</Dialog.Title>
+            <Dialog.Title>
+              {isCatSetup ? 'Кот в мешке' : isAuctionSetup ? 'Вопрос-аукцион' : prompt}
+            </Dialog.Title>
             <Dialog.Description id="question-panel-description">
-              Ведущий выбирает участника, который отвечает на вопрос.
+              {isCatSetup
+                ? 'Ведущий назначает получателя, затем выбирает минимальную или максимальную цену.'
+                : isAuctionSetup
+                  ? 'После устных торгов ведущий выбирает победителя и вводит итоговую ставку.'
+                  : 'Ведущий выбирает участника, который отвечает на вопрос.'}
             </Dialog.Description>
           </div>
 
-          {phase === 'question' && (
+          {isCatSetup && (
+            <div className={styles.catSetup}>
+              {!activeParticipant ? (
+                <>
+                  <p>Кому достанется «Кот в мешке»?</p>
+                  <div className={styles.catOptions}>
+                    {participants.map((participant) => (
+                      <button
+                        type="button"
+                        key={participant.id}
+                        onClick={() => chooseCatRecipient(participant.id)}
+                      >
+                        {participant.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Получатель: <strong>{activeParticipant.name}</strong>. Выберите цену вопроса.
+                  </p>
+                  <div className={styles.priceOptions}>
+                    {activeQuestion.catPriceOptions?.map((price) => (
+                      <button type="button" key={price} onClick={() => chooseCatPrice(price)}>
+                        {price}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {isAuctionSetup && (
+            <div className={styles.auctionSetup}>
+              {!activeParticipant ? (
+                <>
+                  <p>Кто выиграл устные торги?</p>
+                  <div className={styles.auctionOptions}>
+                    {participants.map((participant) => (
+                      <button
+                        type="button"
+                        key={participant.id}
+                        onClick={() => chooseAuctionWinner(participant.id)}
+                      >
+                        {participant.name}
+                        <span>Счёт: {scores[participant.id] ?? 0}</span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p>
+                    Победитель: <strong>{activeParticipant.name}</strong>. Введите итоговую ставку.
+                  </p>
+                  {activeQuestion.auctionBidRange && (
+                    <form className={styles.bidForm} onSubmit={submitAuctionBid}>
+                      <label htmlFor="auction-bid">
+                        Ставка от {activeQuestion.auctionBidRange.minimum} до{' '}
+                        {activeQuestion.auctionBidRange.maximum}
+                      </label>
+                      <div>
+                        <input
+                          id="auction-bid"
+                          name="auctionBid"
+                          type="number"
+                          min={activeQuestion.auctionBidRange.minimum}
+                          max={activeQuestion.auctionBidRange.maximum}
+                          step="1"
+                          defaultValue={activeQuestion.auctionBidRange.minimum}
+                          required
+                        />
+                        <button type="submit">Подтвердить ставку</button>
+                      </div>
+                    </form>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {!isSpecialSetup && phase === 'question' && (
             <div className={styles.answererSelection}>
               <p>Кто отвечает?</p>
               <div>
@@ -97,7 +205,7 @@ export function QuestionPanel() {
           {phase === 'answerReveal' && (
             <div className={styles.answerReveal}>
               <span>Правильный ответ</span>
-              <p>{question.answer}</p>
+              <p>{answer}</p>
               {activeQuestion.attempts.length > 0 && (
                 <ul>
                   {activeQuestion.attempts.map((attempt) => {

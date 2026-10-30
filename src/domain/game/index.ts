@@ -1,4 +1,5 @@
-export * from './demo-game'
+export * from './content'
+export * from './default-game'
 export * from './game-engine'
 export * from './model'
 export * from './participants'

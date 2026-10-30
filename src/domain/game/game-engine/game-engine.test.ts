@@ -16,7 +16,9 @@ describe('transitionGame', () => {
     const questionState = transitionGame(initialState, {
       type: 'questionSelected',
       questionId: 'q1',
+      questionType: 'regular',
       price: 100,
+      catPriceOptions: null,
       participantIds: ['player1', 'player2'],
     })
     const judgingState = transitionGame(questionState, {
@@ -34,7 +36,9 @@ describe('transitionGame', () => {
     const questionState = transitionGame(initialState, {
       type: 'questionSelected',
       questionId: 'q1',
+      questionType: 'regular',
       price: 100,
+      catPriceOptions: null,
       participantIds: ['player1', 'player2'],
     })
     const judgingState = transitionGame(questionState, {
@@ -52,7 +56,9 @@ describe('transitionGame', () => {
     const questionState = transitionGame(initialState, {
       type: 'questionSelected',
       questionId: 'q1',
+      questionType: 'regular',
       price: 200,
+      catPriceOptions: null,
       participantIds: ['player1', 'player2'],
     })
     const judgingState = transitionGame(questionState, {
@@ -73,7 +79,10 @@ describe('transitionGame', () => {
       usedQuestionIds: ['q1'],
       activeQuestion: {
         questionId: 'q2',
+        type: 'regular',
         price: 100,
+        catPriceOptions: null,
+        auctionBidRange: null,
         eligibleParticipantIds: ['player1'],
         activeParticipantId: null,
         attempts: [],
@@ -95,6 +104,99 @@ describe('transitionGame', () => {
 
     expect(result.roundIndex).toBe(1)
     expect(result.phase).toBe('board')
+  })
+
+  it('assigns a cat recipient and uses one of the round edge prices', () => {
+    const catState = transitionGame(initialState, {
+      type: 'questionSelected',
+      questionId: 'cat-1',
+      questionType: 'cat',
+      price: 300,
+      catPriceOptions: [100, 500],
+      participantIds: ['player1', 'player2'],
+    })
+    const recipientState = transitionGame(catState, {
+      type: 'catRecipientChosen',
+      participantId: 'player2',
+    })
+    const result = transitionGame(recipientState, { type: 'catPriceChosen', price: 500 })
+
+    expect(result).toMatchObject({
+      phase: 'judging',
+      activeQuestion: {
+        price: 500,
+        activeParticipantId: 'player2',
+        eligibleParticipantIds: ['player2'],
+      },
+    })
+  })
+
+  it('rejects a cat price outside the configured min/max pair', () => {
+    const catState = transitionGame(initialState, {
+      type: 'questionSelected',
+      questionId: 'cat-1',
+      questionType: 'cat',
+      price: 300,
+      catPriceOptions: [100, 500],
+      participantIds: ['player1', 'player2'],
+    })
+    const recipientState = transitionGame(catState, {
+      type: 'catRecipientChosen',
+      participantId: 'player1',
+    })
+
+    expect(transitionGame(recipientState, { type: 'catPriceChosen', price: 300 })).toBe(
+      recipientState,
+    )
+  })
+
+  it('accepts the final auction bid within the winner score', () => {
+    const auctionState = transitionGame(
+      { ...initialState, scores: { player1: 1200, player2: 0 } },
+      {
+        type: 'questionSelected',
+        questionId: 'auction-1',
+        questionType: 'auction',
+        price: 500,
+        catPriceOptions: null,
+        participantIds: ['player1', 'player2'],
+      },
+    )
+    const winnerState = transitionGame(auctionState, {
+      type: 'auctionWinnerChosen',
+      participantId: 'player1',
+    })
+    const result = transitionGame(winnerState, { type: 'auctionBidChosen', bid: 900 })
+
+    expect(result).toMatchObject({
+      phase: 'judging',
+      activeQuestion: {
+        price: 900,
+        activeParticipantId: 'player1',
+        eligibleParticipantIds: ['player1'],
+      },
+    })
+  })
+
+  it('limits a non-positive auction winner to the nominal price', () => {
+    const auctionState = transitionGame(
+      { ...initialState, scores: { player1: 0, player2: -200 } },
+      {
+        type: 'questionSelected',
+        questionId: 'auction-1',
+        questionType: 'auction',
+        price: 500,
+        catPriceOptions: null,
+        participantIds: ['player1', 'player2'],
+      },
+    )
+    const winnerState = transitionGame(auctionState, {
+      type: 'auctionWinnerChosen',
+      participantId: 'player2',
+    })
+
+    expect(winnerState.activeQuestion?.auctionBidRange).toEqual({ minimum: 500, maximum: 500 })
+    expect(transitionGame(winnerState, { type: 'auctionBidChosen', bid: 600 })).toBe(winnerState)
   })
 
   it('ignores a command that is invalid for the current phase', () => {

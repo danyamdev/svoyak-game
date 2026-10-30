@@ -1,6 +1,6 @@
 import { Link, Navigate } from 'react-router-dom'
 
-import { DEMO_ROUNDS } from '../../domain/game'
+import { DEFAULT_GAME_DEFINITION } from '../../domain/game'
 import { useGameSessionStore } from '../../features/game-session-store'
 import { QuestionPanel } from '../../widgets/question-panel'
 import { RoundCompletePanel } from '../../widgets/round-complete-panel'
@@ -22,7 +22,7 @@ export function GamePage() {
     return <Navigate to="/setup" replace />
   }
 
-  const categories = DEMO_ROUNDS[roundIndex]
+  const round = DEFAULT_GAME_DEFINITION.rounds[roundIndex]
 
   return (
     <main className={styles.page}>
@@ -65,12 +65,12 @@ export function GamePage() {
         <div className={styles.roundControls}>
           <div>
             <span>Основная игра</span>
-            <h1>Раунд {roundIndex + 1}</h1>
+            <h1>{round.title}</h1>
           </div>
         </div>
 
         <div className={styles.board} aria-label={`Игровое поле, раунд ${roundIndex + 1}`}>
-          {categories.map((category) => (
+          {round.categories.map((category) => (
             <div className={styles.boardRow} key={category.id}>
               <div className={styles.category}>{category.title}</div>
               {category.questions.map((question) => {
@@ -83,7 +83,7 @@ export function GamePage() {
                     key={question.id}
                     disabled={isUsed || phase !== 'board'}
                     aria-label={`${category.title} за ${question.price}`}
-                    onClick={() => selectQuestion(question.id, question.price)}
+                    onClick={() => selectQuestion(question.id)}
                   >
                     {isUsed ? '—' : question.price}
                   </button>

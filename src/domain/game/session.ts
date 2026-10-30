@@ -5,6 +5,8 @@ import { participantsSchema } from './participants'
 export const gamePhaseSchema = z.enum([
   'setup',
   'board',
+  'catSetup',
+  'auctionSetup',
   'question',
   'judging',
   'answerReveal',
@@ -25,7 +27,15 @@ const attemptSchema = z.object({
 
 const activeQuestionSchema = z.object({
   questionId: z.string().trim().min(1),
+  type: z.enum(['regular', 'cat', 'auction']),
   price: z.number().int().positive(),
+  catPriceOptions: z.tuple([z.number().int().positive(), z.number().int().positive()]).nullable(),
+  auctionBidRange: z
+    .object({
+      minimum: z.number().int().positive(),
+      maximum: z.number().int().positive(),
+    })
+    .nullable(),
   eligibleParticipantIds: z.array(z.string().trim().min(1)),
   activeParticipantId: z.string().trim().min(1).nullable(),
   attempts: z.array(attemptSchema),
