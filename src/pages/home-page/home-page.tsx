@@ -1,9 +1,14 @@
+import { Link } from 'react-router-dom'
+
+import { useGameSessionStore } from '../../features/game-session-store'
 import styles from './home-page.module.scss'
 
 const previewCategories = ['Призраки', 'Зелья', 'Проклятия']
 const previewPrices = [100, 200, 300, 400, 500]
 
 export function HomePage() {
+  const hasActiveSession = useGameSessionStore(({ status }) => status === 'active')
+
   return (
     <main className={styles.page}>
       <div className={styles.decorations} aria-hidden="true">
@@ -32,11 +37,17 @@ export function HomePage() {
           </p>
 
           <div className={styles.actions}>
-            <button className={styles.primaryAction} type="button" disabled>
+            <Link className={styles.primaryAction} to="/setup">
               Создать игру
               <span aria-hidden="true">→</span>
-            </button>
-            <p className={styles.developmentNote}>Настройка игры появится на следующем этапе</p>
+            </Link>
+            {hasActiveSession ? (
+              <Link className={styles.secondaryAction} to="/game">
+                Продолжить игру
+              </Link>
+            ) : (
+              <p className={styles.developmentNote}>Настройте участников и начните новую игру</p>
+            )}
           </div>
 
           <ul className={styles.features} aria-label="Возможности игры">
