@@ -1,0 +1,293 @@
+.overlay {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  background: rgb(7 2 21 / 92%);
+  backdrop-filter: blur(0.55rem);
+}
+
+.panel {
+  position: fixed;
+  z-index: 31;
+  top: 50%;
+  left: 50%;
+  width: min(calc(100% - 2rem), 52rem);
+  max-height: calc(100svh - 2rem);
+  padding: clamp(1rem, 3vw, 2rem);
+  overflow-y: auto;
+  color: var(--color-cream);
+  background:
+    radial-gradient(circle at 50% 0, rgb(185 242 39 / 16%), transparent 22rem),
+    linear-gradient(145deg, rgb(54 18 104), rgb(17 6 42));
+  border: 0.15rem solid var(--color-cyan);
+  border-radius: 1.5rem;
+  box-shadow: 0 2rem 8rem rgb(0 0 0 / 65%);
+  translate: -50% -50%;
+
+  h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.7rem, 5vw, 2.7rem);
+    color: var(--color-lime);
+    text-align: center;
+    text-transform: uppercase;
+  }
+}
+
+.header {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+
+  span {
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: var(--color-orange-light);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  button {
+    padding: 0.55rem 0.75rem;
+    color: var(--color-cream);
+    background: rgb(255 255 255 / 7%);
+    border: 1px solid rgb(255 255 255 / 14%);
+    border-radius: 0.6rem;
+  }
+}
+
+.themeSelection,
+.wagerSection,
+.questionSection,
+.judgingSection,
+.tieJudging,
+.results {
+  > p,
+  > [data-radix-collection-item] {
+    text-align: center;
+  }
+
+  > p {
+    color: rgb(255 243 214 / 66%);
+  }
+}
+
+.themeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+
+  button {
+    min-height: 4rem;
+    padding: 0.75rem;
+    font-family: var(--font-display);
+    font-weight: 900;
+    color: var(--color-ink);
+    background: var(--color-orange-light);
+    border: 0;
+    border-radius: 0.8rem;
+  }
+}
+
+.eliminatedTheme {
+  text-decoration: line-through;
+  opacity: 0.25;
+}
+
+.wagerSection form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 32rem;
+  margin: 1.5rem auto 0;
+
+  label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7rem;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.75rem;
+    background: rgb(255 255 255 / 7%);
+    border-radius: 0.75rem;
+  }
+
+  input {
+    width: 100%;
+    min-height: 2.7rem;
+    padding: 0.5rem;
+    color: var(--color-ink);
+    background: var(--color-cream);
+    border: 0.12rem solid var(--color-orange-light);
+    border-radius: 0.55rem;
+  }
+
+  > button {
+    min-height: 3.2rem;
+    font-weight: 900;
+    color: var(--color-ink);
+    background: var(--color-lime);
+    border: 0;
+    border-radius: 0.75rem;
+  }
+}
+
+.questionSection {
+  display: grid;
+  min-height: 24rem;
+  text-align: center;
+  place-content: center;
+
+  > p {
+    max-width: 32ch;
+    margin: 2rem auto;
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 4vw, 2.4rem);
+    color: var(--color-cream);
+  }
+
+  > button {
+    justify-self: center;
+    padding: 0.8rem 1.1rem;
+    font-weight: 900;
+    color: var(--color-ink);
+    background: var(--color-orange);
+    border: 0;
+    border-radius: 0.7rem;
+  }
+}
+
+.judgingSection > div {
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+
+  article {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.8rem;
+    background: rgb(255 255 255 / 7%);
+    border-radius: 0.75rem;
+  }
+
+  p {
+    display: grid;
+    gap: 0.2rem;
+    margin: 0;
+
+    span {
+      font-size: 0.75rem;
+      color: rgb(255 243 214 / 62%);
+    }
+  }
+
+  article > div {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  button {
+    padding: 0.65rem 0.9rem;
+    font-weight: 900;
+    border: 0;
+    border-radius: 0.55rem;
+  }
+}
+
+.incorrectButton {
+  color: var(--color-cream);
+  background: var(--color-pink);
+}
+
+.correctButton {
+  color: var(--color-ink);
+  background: var(--color-lime);
+}
+
+.judged {
+  color: var(--color-lime);
+}
+
+.tieJudging > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.7rem;
+  margin-top: 1.5rem;
+
+  button {
+    min-height: 3.5rem;
+    font-weight: 900;
+    color: var(--color-ink);
+    background: var(--color-cyan);
+    border: 0;
+    border-radius: 0.7rem;
+  }
+}
+
+.results {
+  ol {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0;
+    margin: 1.5rem 0;
+    list-style: none;
+  }
+
+  li {
+    display: grid;
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgb(255 255 255 / 7%);
+    border-radius: 0.7rem;
+  }
+
+  > div {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  a,
+  button {
+    display: grid;
+    min-height: 3rem;
+    padding: 0.7rem;
+    font-weight: 900;
+    border-radius: 0.7rem;
+    place-items: center;
+  }
+
+  a {
+    color: var(--color-cream);
+    text-decoration: none;
+    background: rgb(255 255 255 / 8%);
+    border: 1px solid rgb(255 255 255 / 14%);
+  }
+
+  button {
+    color: var(--color-ink);
+    background: var(--color-lime);
+    border: 0;
+  }
+}
+
+@media (width <= 36rem) {
+  .panel {
+    width: calc(100% - 1rem);
+    max-height: calc(100svh - 1rem);
+    padding: 0.85rem;
+  }
+
+  .wagerSection form label,
+  .judgingSection > div article {
+    grid-template-columns: 1fr;
+  }
+
+  .results > div {
+    grid-template-columns: 1fr;
+  }
+}

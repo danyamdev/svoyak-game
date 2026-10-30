@@ -11,11 +11,12 @@ export const gamePhaseSchema = z.enum([
   'judging',
   'answerReveal',
   'roundComplete',
-  'finalCategorySelection',
+  'finalThemeSelection',
   'finalWager',
   'finalQuestion',
   'finalJudging',
-  'tieBreaker',
+  'tieBreakerQuestion',
+  'tieBreakerJudging',
   'results',
 ])
 
@@ -41,6 +42,17 @@ const activeQuestionSchema = z.object({
   attempts: z.array(attemptSchema),
 })
 
+const finalStateSchema = z.object({
+  themeIds: z.array(z.string().trim().min(1)),
+  eliminatedThemeIds: z.array(z.string().trim().min(1)),
+  selectedThemeId: z.string().trim().min(1).nullable(),
+  eligibleParticipantIds: z.array(z.string().trim().min(1)),
+  wagers: z.record(z.string(), z.number().int().positive()),
+  judgedParticipantIds: z.array(z.string().trim().min(1)),
+  tieParticipantIds: z.array(z.string().trim().min(1)),
+  winnerParticipantIds: z.array(z.string().trim().min(1)),
+})
+
 export const gameSessionSchema = z.object({
   schemaVersion: z.literal(1),
   id: z.string().trim().min(1),
@@ -52,6 +64,7 @@ export const gameSessionSchema = z.object({
   selectorParticipantId: z.string().trim().min(1),
   usedQuestionIds: z.array(z.string().trim().min(1)),
   activeQuestion: activeQuestionSchema.nullable(),
+  finalState: finalStateSchema.nullable(),
   updatedAt: z.string().datetime(),
 })
 

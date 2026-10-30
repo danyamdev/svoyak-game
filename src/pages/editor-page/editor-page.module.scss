@@ -1,0 +1,238 @@
+.page {
+  min-height: 100svh;
+  padding: 1.25rem clamp(0.75rem, 3vw, 3rem) 4rem;
+  background:
+    radial-gradient(circle at 50% 0, rgb(255 122 0 / 13%), transparent 32rem),
+    var(--color-night-deep);
+}
+
+.header {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 1rem;
+  align-items: center;
+  width: min(100%, 80rem);
+  margin: 0 auto;
+
+  a {
+    font-weight: 850;
+    color: var(--color-cream);
+    text-decoration: none;
+  }
+
+  div {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+    font-size: 0.75rem;
+    color: rgb(255 243 214 / 62%);
+
+    span {
+      width: 0.5rem;
+      height: 0.5rem;
+      background: var(--color-lime);
+      border-radius: 50%;
+    }
+  }
+
+  button {
+    justify-self: end;
+    padding: 0.6rem 0.8rem;
+    color: var(--color-cream);
+    background: rgb(255 255 255 / 7%);
+    border: 1px solid rgb(255 255 255 / 14%);
+    border-radius: 0.65rem;
+  }
+}
+
+.intro {
+  width: min(100%, 48rem);
+  margin: 3rem auto 2rem;
+  text-align: center;
+
+  > p {
+    margin: 0;
+    font-size: 0.75rem;
+    font-weight: 900;
+    color: var(--color-orange-light);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  h1 {
+    margin: 0.35rem 0 1.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 6vw, 3.4rem);
+    color: var(--color-lime);
+    text-transform: uppercase;
+  }
+}
+
+.intro label,
+.roundTitle,
+.categoryTitle,
+.questionCard label,
+.finalEditor label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: rgb(255 243 214 / 70%);
+  text-align: left;
+}
+
+.intro input,
+.roundEditor input,
+.roundEditor textarea,
+.roundEditor select,
+.finalEditor input,
+.finalEditor textarea {
+  width: 100%;
+  padding: 0.7rem;
+  color: var(--color-cream);
+  background: rgb(255 255 255 / 7%);
+  border: 1px solid rgb(255 255 255 / 14%);
+  border-radius: 0.6rem;
+
+  &:focus {
+    outline: 0.16rem solid var(--color-cyan);
+    outline-offset: 0.12rem;
+  }
+}
+
+.roundTabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  width: min(100%, 42rem);
+  margin: 0 auto 1.5rem;
+
+  button {
+    padding: 0.8rem;
+    font-weight: 900;
+    color: var(--color-cream);
+    background: rgb(255 255 255 / 7%);
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 0.7rem;
+
+    &[aria-pressed='true'] {
+      color: var(--color-ink);
+      background: var(--color-orange);
+    }
+  }
+}
+
+.roundEditor,
+.finalEditor {
+  display: grid;
+  gap: 1rem;
+  width: min(100%, 80rem);
+  margin: 0 auto;
+}
+
+.roundTitle {
+  max-width: 32rem;
+  margin: 0 auto 0.5rem;
+}
+
+.categoryCard,
+.finalEditor,
+.tieBreakerEditor {
+  padding: clamp(0.85rem, 2.5vw, 1.5rem);
+  background: rgb(31 11 67 / 88%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 1.1rem;
+}
+
+.categoryTitle {
+  max-width: 30rem;
+  margin-bottom: 1rem;
+}
+
+.questionList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: 0.75rem;
+}
+
+.questionCard {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  background: rgb(255 255 255 / 5%);
+  border-radius: 0.8rem;
+}
+
+.questionMeta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6rem 9rem;
+  gap: 0.6rem;
+  align-items: end;
+
+  strong {
+    align-self: center;
+    color: var(--color-lime);
+  }
+}
+
+.finalEditor {
+  margin-top: 3rem;
+
+  > div:first-child {
+    text-align: center;
+
+    p {
+      margin: 0;
+      color: var(--color-orange-light);
+    }
+
+    h2 {
+      margin: 0.25rem 0;
+      font-family: var(--font-display);
+      color: var(--color-lime);
+      text-transform: uppercase;
+    }
+  }
+}
+
+.finalThemes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 0.75rem;
+
+  article {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.85rem;
+    background: rgb(255 255 255 / 5%);
+    border-radius: 0.75rem;
+  }
+}
+
+.tieBreakerEditor {
+  display: grid;
+  gap: 0.75rem;
+
+  h2 {
+    margin: 0;
+    color: var(--color-orange-light);
+  }
+}
+
+@media (width <= 42rem) {
+  .header {
+    grid-template-columns: 1fr auto;
+
+    div {
+      display: none;
+    }
+  }
+
+  .questionMeta {
+    grid-template-columns: 1fr 6rem;
+
+    label:last-child {
+      grid-column: 1 / -1;
+    }
+  }
+}

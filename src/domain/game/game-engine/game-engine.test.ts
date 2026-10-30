@@ -9,6 +9,7 @@ const initialState: GameRuntimeState = {
   usedQuestionIds: [],
   activeQuestion: null,
   selectorParticipantId: 'player1',
+  finalState: null,
 }
 
 describe('transitionGame', () => {
@@ -197,6 +198,72 @@ describe('transitionGame', () => {
 
     expect(winnerState.activeQuestion?.auctionBidRange).toEqual({ minimum: 500, maximum: 500 })
     expect(transitionGame(winnerState, { type: 'auctionBidChosen', bid: 600 })).toBe(winnerState)
+  })
+
+  it('plays the final and resolves equal scores with a tie-breaker', () => {
+    let state: GameRuntimeState = {
+      ...initialState,
+      phase: 'roundComplete',
+      scores: { player1: 1000, player2: 800 },
+    }
+
+    state = transitionGame(state, {
+      type: 'finalStarted',
+      themeIds: ['t1', 't2', 't3', 't4', 't5', 't6', 't7'],
+      participantIds: ['player1', 'player2'],
+    })
+    for (const themeId of ['t1', 't2', 't3', 't4', 't5', 't6']) {
+      state = transitionGame(state, { type: 'finalThemeEliminated', themeId })
+    }
+
+    expect(state.phase).toBe('finalWager')
+    expect(state.finalState?.selectedThemeId).toBe('t7')
+
+    state = transitionGame(state, {
+      type: 'finalWagersSubmitted',
+      wagers: { player1: 500, player2: 700 },
+    })
+    state = transitionGame(state, { type: 'finalQuestionOpened' })
+    state = transitionGame(state, { type: 'finalAnswerRevealed' })
+    state = transitionGame(state, {
+      type: 'finalParticipantJudged',
+      participantId: 'player1',
+      result: 'correct',
+    })
+    state = transitionGame(state, {
+      type: 'finalParticipantJudged',
+      participantId: 'player2',
+      result: 'correct',
+    })
+
+    expect(state.phase).toBe('tieBreakerQuestion')
+    expect(state.scores).toEqual({ player1: 1500, player2: 1500 })
+
+    state = transitionGame(state, { type: 'tieBreakerAnswerRevealed' })
+    state = transitionGame(state, {
+      type: 'tieBreakerWinnerChosen',
+      participantId: 'player2',
+    })
+
+    expect(state.phase).toBe('results')
+    expect(state.finalState?.winnerParticipantIds).toEqual(['player2'])
+  })
+
+  it('does not admit a participant with a non-positive score to the final', () => {
+    const result = transitionGame(
+      {
+        ...initialState,
+        phase: 'roundComplete',
+        scores: { player1: 500, player2: 0 },
+      },
+      {
+        type: 'finalStarted',
+        themeIds: ['t1'],
+        participantIds: ['player1', 'player2'],
+      },
+    )
+
+    expect(result.finalState?.eligibleParticipantIds).toEqual(['player1'])
   })
 
   it('ignores a command that is invalid for the current phase', () => {

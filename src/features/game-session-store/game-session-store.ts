@@ -2,14 +2,13 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import {
-  DEFAULT_GAME_DEFINITION,
   type GameCommand,
   type GameRuntimeState,
   findGameQuestion,
-  getCatPrices,
   participantsSchema,
   transitionGame,
 } from '../../domain/game'
+import { getGameDefinition } from '../game-definition-store'
 import {
   type GameMode,
   type ParticipantDraft,
@@ -47,7 +46,7 @@ function createParticipant(mode: GameMode, index: number): ParticipantDraft {
 
 function createInitialState(mode: GameMode = 'individual'): PersistedGameState {
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     mode,
     participants: [createParticipant(mode, 0), createParticipant(mode, 1)],
     scores: {},
@@ -57,6 +56,7 @@ function createInitialState(mode: GameMode = 'individual'): PersistedGameState {
     usedQuestionIds: [],
     activeQuestion: null,
     selectorParticipantId: null,
+    finalState: null,
     history: [],
   }
 }
@@ -69,6 +69,7 @@ function toRuntimeState(state: GameSessionStore): GameRuntimeState {
     usedQuestionIds: state.usedQuestionIds,
     activeQuestion: state.activeQuestion,
     selectorParticipantId: state.selectorParticipantId,
+    finalState: state.finalState,
   }
 }
 
@@ -107,6 +108,15 @@ interface GameSessionActions {
   skipQuestion: () => void
   continueAfterAnswer: () => void
   advanceRound: () => void
+  startFinal: () => void
+  eliminateFinalTheme: (themeId: string) => void
+  submitFinalWagers: (wagers: Record<string, number>) => void
+  openFinalQuestion: () => void
+  revealFinalAnswer: () => void
+  judgeFinalParticipant: (participantId: string, result: 'correct' | 'incorrect') => void
+  revealTieBreakerAnswer: () => void
+  chooseTieBreakerWinner: (participantId: string) => void
+  restartSession: () => void
   undo: () => void
   resetSession: () => void
 }
@@ -211,6 +221,7 @@ export const useGameSessionStore = create<GameSessionStore>()(
             usedQuestionIds: [],
             activeQuestion: null,
             selectorParticipantId: result.data[0]?.id ?? null,
+            finalState: null,
             history: [],
           })
 
@@ -219,18 +230,24 @@ export const useGameSessionStore = create<GameSessionStore>()(
         changeScore: (participantId, delta) =>
           dispatch({ type: 'scoreAdjusted', participantId, delta }),
         selectQuestion: (questionId) => {
-          const lookup = findGameQuestion(questionId)
+          const definition = getGameDefinition()
+          const lookup = findGameQuestion(definition, questionId)
           if (!lookup) return
+
+          const roundPrices = definition.rounds[get().roundIndex].categories.flatMap(
+            ({ questions }) => questions.map(({ price }) => price),
+          )
+          const catPriceOptions: [number, number] = [
+            Math.min(...roundPrices),
+            Math.max(...roundPrices),
+          ]
 
           dispatch({
             type: 'questionSelected',
             questionId,
             questionType: lookup.question.type,
             price: lookup.question.price,
-            catPriceOptions:
-              lookup.question.type === 'cat'
-                ? ([...getCatPrices(get().roundIndex)] as [number, number])
-                : null,
+            catPriceOptions: lookup.question.type === 'cat' ? catPriceOptions : null,
             participantIds: get().participants.map(({ id }) => id),
           })
         },
@@ -247,15 +264,44 @@ export const useGameSessionStore = create<GameSessionStore>()(
         continueAfterAnswer: () =>
           dispatch({
             type: 'answerClosed',
-            roundQuestionIds: DEFAULT_GAME_DEFINITION.rounds[get().roundIndex].categories.flatMap(
+            roundQuestionIds: getGameDefinition().rounds[get().roundIndex].categories.flatMap(
               ({ questions }) => questions.map(({ id }) => id),
             ),
           }),
         advanceRound: () =>
           dispatch({
             type: 'nextRoundStarted',
-            totalRounds: DEFAULT_GAME_DEFINITION.rounds.length,
+            totalRounds: getGameDefinition().rounds.length,
           }),
+        startFinal: () =>
+          dispatch({
+            type: 'finalStarted',
+            themeIds: getGameDefinition().finalThemes.map(({ id }) => id),
+            participantIds: get().participants.map(({ id }) => id),
+          }),
+        eliminateFinalTheme: (themeId) => dispatch({ type: 'finalThemeEliminated', themeId }),
+        submitFinalWagers: (wagers) => dispatch({ type: 'finalWagersSubmitted', wagers }),
+        openFinalQuestion: () => dispatch({ type: 'finalQuestionOpened' }),
+        revealFinalAnswer: () => dispatch({ type: 'finalAnswerRevealed' }),
+        judgeFinalParticipant: (participantId, result) =>
+          dispatch({ type: 'finalParticipantJudged', participantId, result }),
+        revealTieBreakerAnswer: () => dispatch({ type: 'tieBreakerAnswerRevealed' }),
+        chooseTieBreakerWinner: (participantId) =>
+          dispatch({ type: 'tieBreakerWinnerChosen', participantId }),
+        restartSession: () => {
+          const { participants } = get()
+          set({
+            scores: Object.fromEntries(participants.map(({ id }) => [id, 0])),
+            status: 'active',
+            phase: 'board',
+            roundIndex: 0,
+            usedQuestionIds: [],
+            activeQuestion: null,
+            selectorParticipantId: participants[0]?.id ?? null,
+            finalState: null,
+            history: [],
+          })
+        },
         undo: () => {
           const state = get()
           const previousState = state.history.at(-1)
@@ -271,7 +317,7 @@ export const useGameSessionStore = create<GameSessionStore>()(
     },
     {
       name: STORAGE_KEY,
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => localStorage),
       migrate: migratePersistedGameState,
       partialize: ({
@@ -285,6 +331,7 @@ export const useGameSessionStore = create<GameSessionStore>()(
         usedQuestionIds,
         activeQuestion,
         selectorParticipantId,
+        finalState,
         history,
       }) => ({
         schemaVersion,
@@ -297,6 +344,7 @@ export const useGameSessionStore = create<GameSessionStore>()(
         usedQuestionIds,
         activeQuestion,
         selectorParticipantId,
+        finalState,
         history,
       }),
       merge: (persistedState, currentState) => ({

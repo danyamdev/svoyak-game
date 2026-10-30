@@ -2,10 +2,12 @@ import type { FormEvent } from 'react'
 import { Dialog } from 'radix-ui'
 
 import { findGameQuestion, getContentText } from '../../domain/game'
+import { useGameDefinitionStore } from '../../features/game-definition-store'
 import { useGameSessionStore } from '../../features/game-session-store'
 import styles from './question-panel.module.scss'
 
 export function QuestionPanel() {
+  const definition = useGameDefinitionStore(({ definition }) => definition)
   const {
     phase,
     participants,
@@ -26,7 +28,7 @@ export function QuestionPanel() {
 
   if (!activeQuestion || phase === 'board' || phase === 'setup') return null
 
-  const lookup = findGameQuestion(activeQuestion.questionId)
+  const lookup = findGameQuestion(definition, activeQuestion.questionId)
   if (!lookup) return null
 
   const activeParticipant = participants.find(({ id }) => id === activeQuestion.activeParticipantId)

@@ -1,7 +1,20 @@
 import { getAuctionBidRange } from '../rules'
 
 export type RuntimePhase =
-  'board' | 'catSetup' | 'auctionSetup' | 'question' | 'judging' | 'answerReveal' | 'roundComplete'
+  | 'board'
+  | 'catSetup'
+  | 'auctionSetup'
+  | 'question'
+  | 'judging'
+  | 'answerReveal'
+  | 'roundComplete'
+  | 'finalThemeSelection'
+  | 'finalWager'
+  | 'finalQuestion'
+  | 'finalJudging'
+  | 'tieBreakerQuestion'
+  | 'tieBreakerJudging'
+  | 'results'
 
 export type RuntimeQuestionType = 'regular' | 'cat' | 'auction'
 
@@ -27,6 +40,17 @@ export interface ActiveQuestionState {
   attempts: AnswerAttempt[]
 }
 
+export interface FinalState {
+  themeIds: string[]
+  eliminatedThemeIds: string[]
+  selectedThemeId: string | null
+  eligibleParticipantIds: string[]
+  wagers: Record<string, number>
+  judgedParticipantIds: string[]
+  tieParticipantIds: string[]
+  winnerParticipantIds: string[]
+}
+
 export interface GameRuntimeState {
   scores: Record<string, number>
   roundIndex: number
@@ -34,6 +58,7 @@ export interface GameRuntimeState {
   usedQuestionIds: string[]
   activeQuestion: ActiveQuestionState | null
   selectorParticipantId: string | null
+  finalState: FinalState | null
 }
 
 export type GameCommand =
@@ -56,6 +81,14 @@ export type GameCommand =
   | { type: 'questionSkipped' }
   | { type: 'answerClosed'; roundQuestionIds: string[] }
   | { type: 'nextRoundStarted'; totalRounds: number }
+  | { type: 'finalStarted'; themeIds: string[]; participantIds: string[] }
+  | { type: 'finalThemeEliminated'; themeId: string }
+  | { type: 'finalWagersSubmitted'; wagers: Record<string, number> }
+  | { type: 'finalQuestionOpened' }
+  | { type: 'finalAnswerRevealed' }
+  | { type: 'finalParticipantJudged'; participantId: string; result: 'correct' | 'incorrect' }
+  | { type: 'tieBreakerAnswerRevealed' }
+  | { type: 'tieBreakerWinnerChosen'; participantId: string }
 
 /**
  * Выполняет одну игровую команду без привязки к React, Zustand или хранилищу.
@@ -94,6 +127,22 @@ export function transitionGame(state: GameRuntimeState, command: GameCommand): G
       return closeAnswer(state, command.roundQuestionIds)
     case 'nextRoundStarted':
       return startNextRound(state, command.totalRounds)
+    case 'finalStarted':
+      return startFinal(state, command.themeIds, command.participantIds)
+    case 'finalThemeEliminated':
+      return eliminateFinalTheme(state, command.themeId)
+    case 'finalWagersSubmitted':
+      return submitFinalWagers(state, command.wagers)
+    case 'finalQuestionOpened':
+      return openFinalQuestion(state)
+    case 'finalAnswerRevealed':
+      return revealFinalAnswer(state)
+    case 'finalParticipantJudged':
+      return judgeFinalParticipant(state, command.participantId, command.result)
+    case 'tieBreakerAnswerRevealed':
+      return revealTieBreakerAnswer(state)
+    case 'tieBreakerWinnerChosen':
+      return chooseTieBreakerWinner(state, command.participantId)
   }
 }
 
@@ -299,5 +348,147 @@ function startNextRound(state: GameRuntimeState, totalRounds: number) {
     ...state,
     roundIndex: state.roundIndex + 1,
     phase: 'board' as const,
+  }
+}
+
+function startFinal(
+  state: GameRuntimeState,
+  themeIds: string[],
+  participantIds: string[],
+): GameRuntimeState {
+  if (state.phase !== 'roundComplete' || themeIds.length === 0) return state
+
+  const eligibleParticipantIds = participantIds.filter((id) => (state.scores[id] ?? 0) > 0)
+  const finalState: FinalState = {
+    themeIds,
+    eliminatedThemeIds: [],
+    selectedThemeId: null,
+    eligibleParticipantIds,
+    wagers: {},
+    judgedParticipantIds: [],
+    tieParticipantIds: [],
+    winnerParticipantIds: [],
+  }
+
+  if (eligibleParticipantIds.length === 0) {
+    return finishByScores({ ...state, finalState }, participantIds)
+  }
+
+  return { ...state, phase: 'finalThemeSelection', finalState }
+}
+
+function eliminateFinalTheme(state: GameRuntimeState, themeId: string): GameRuntimeState {
+  const finalState = state.finalState
+  if (state.phase !== 'finalThemeSelection' || !finalState) return state
+  if (!finalState.themeIds.includes(themeId) || finalState.eliminatedThemeIds.includes(themeId)) {
+    return state
+  }
+
+  const remainingThemeIds = finalState.themeIds.filter(
+    (id) => id !== themeId && !finalState.eliminatedThemeIds.includes(id),
+  )
+  if (remainingThemeIds.length === 0) return state
+
+  const eliminatedThemeIds = [...finalState.eliminatedThemeIds, themeId]
+  return {
+    ...state,
+    phase: remainingThemeIds.length === 1 ? ('finalWager' as const) : state.phase,
+    finalState: {
+      ...finalState,
+      eliminatedThemeIds,
+      selectedThemeId: remainingThemeIds.length === 1 ? remainingThemeIds[0] : null,
+    },
+  }
+}
+
+function submitFinalWagers(
+  state: GameRuntimeState,
+  wagers: Record<string, number>,
+): GameRuntimeState {
+  const finalState = state.finalState
+  if (state.phase !== 'finalWager' || !finalState) return state
+
+  const areWagersValid = finalState.eligibleParticipantIds.every((participantId) => {
+    const wager = wagers[participantId]
+    return Number.isInteger(wager) && wager >= 1 && wager <= (state.scores[participantId] ?? 0)
+  })
+  if (!areWagersValid) return state
+
+  return { ...state, finalState: { ...finalState, wagers } }
+}
+
+function openFinalQuestion(state: GameRuntimeState): GameRuntimeState {
+  const finalState = state.finalState
+  if (state.phase !== 'finalWager' || !finalState) return state
+  if (Object.keys(finalState.wagers).length !== finalState.eligibleParticipantIds.length)
+    return state
+
+  return { ...state, phase: 'finalQuestion' as const }
+}
+
+function revealFinalAnswer(state: GameRuntimeState): GameRuntimeState {
+  if (state.phase !== 'finalQuestion' || !state.finalState) return state
+  return { ...state, phase: 'finalJudging' as const }
+}
+
+function judgeFinalParticipant(
+  state: GameRuntimeState,
+  participantId: string,
+  result: 'correct' | 'incorrect',
+): GameRuntimeState {
+  const finalState = state.finalState
+  if (state.phase !== 'finalJudging' || !finalState) return state
+  if (!finalState.eligibleParticipantIds.includes(participantId)) return state
+  if (finalState.judgedParticipantIds.includes(participantId)) return state
+
+  const wager = finalState.wagers[participantId]
+  if (!wager) return state
+
+  const judgedParticipantIds = [...finalState.judgedParticipantIds, participantId]
+  const nextState = {
+    ...state,
+    scores: {
+      ...state.scores,
+      [participantId]: (state.scores[participantId] ?? 0) + (result === 'correct' ? wager : -wager),
+    },
+    finalState: { ...finalState, judgedParticipantIds },
+  }
+
+  if (judgedParticipantIds.length < finalState.eligibleParticipantIds.length) return nextState
+  return finishByScores(nextState, finalState.eligibleParticipantIds)
+}
+
+function finishByScores(state: GameRuntimeState, participantIds: string[]): GameRuntimeState {
+  const finalState = state.finalState
+  if (!finalState || participantIds.length === 0) return state
+
+  const highestScore = Math.max(...participantIds.map((id) => state.scores[id] ?? 0))
+  const leaders = participantIds.filter((id) => (state.scores[id] ?? 0) === highestScore)
+
+  return {
+    ...state,
+    phase: leaders.length > 1 ? 'tieBreakerQuestion' : 'results',
+    finalState: {
+      ...finalState,
+      tieParticipantIds: leaders.length > 1 ? leaders : [],
+      winnerParticipantIds: leaders.length === 1 ? leaders : [],
+    },
+  }
+}
+
+function revealTieBreakerAnswer(state: GameRuntimeState): GameRuntimeState {
+  if (state.phase !== 'tieBreakerQuestion' || !state.finalState) return state
+  return { ...state, phase: 'tieBreakerJudging' as const }
+}
+
+function chooseTieBreakerWinner(state: GameRuntimeState, participantId: string): GameRuntimeState {
+  const finalState = state.finalState
+  if (state.phase !== 'tieBreakerJudging' || !finalState) return state
+  if (!finalState.tieParticipantIds.includes(participantId)) return state
+
+  return {
+    ...state,
+    phase: 'results' as const,
+    finalState: { ...finalState, winnerParticipantIds: [participantId] },
   }
 }

@@ -4,6 +4,7 @@ export {
   type AnswerAttempt,
   type GameCommand,
   type GameRuntimeState,
+  type FinalState,
   type RuntimeBidRange,
   type RuntimeQuestionType,
   type RuntimePhase,

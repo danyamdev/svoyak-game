@@ -7,7 +7,7 @@ import {
 } from './persisted-state'
 
 const fallbackState: PersistedGameState = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   mode: 'individual',
   participants: [
     { type: 'individual', id: 'player-1', name: 'Анна' },
@@ -20,6 +20,7 @@ const fallbackState: PersistedGameState = {
   usedQuestionIds: [],
   activeQuestion: null,
   selectorParticipantId: null,
+  finalState: null,
   history: [],
 }
 
@@ -54,7 +55,7 @@ describe('restorePersistedGameState', () => {
     }
 
     expect(migratePersistedGameState(legacyState, 1)).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       scores: legacyState.scores,
       roundIndex: 1,
       usedQuestionIds: [],
@@ -78,7 +79,7 @@ describe('restorePersistedGameState', () => {
     }
 
     expect(migratePersistedGameState(legacyState, 2)).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       activeQuestion: {
         questionId: 'question-1',
         type: 'regular',
@@ -106,13 +107,22 @@ describe('restorePersistedGameState', () => {
     }
 
     expect(migratePersistedGameState(legacyState, 3)).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       phase: 'catSetup',
       activeQuestion: {
         type: 'cat',
         activeParticipantId: 'player-2',
         auctionBidRange: null,
       },
+    })
+  })
+
+  it('migrates a version 4 game by adding an empty final state', () => {
+    const legacyState = { ...fallbackState, schemaVersion: 4 }
+
+    expect(migratePersistedGameState(legacyState, 4)).toMatchObject({
+      schemaVersion: 5,
+      finalState: null,
     })
   })
 })

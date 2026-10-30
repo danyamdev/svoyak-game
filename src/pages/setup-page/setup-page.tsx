@@ -62,6 +62,9 @@ export function SetupPage() {
           <p>Подготовка к игре</p>
           <h1>Кто сегодня играет?</h1>
           <span>Настройки сохраняются автоматически в этом браузере.</span>
+          <Link className={styles.editorLink} to="/editor">
+            Настроить категории и вопросы →
+          </Link>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>

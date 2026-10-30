@@ -1,11 +1,12 @@
 import { Dialog } from 'radix-ui'
 
-import { DEFAULT_GAME_DEFINITION } from '../../domain/game'
+import { useGameDefinitionStore } from '../../features/game-definition-store'
 import { useGameSessionStore } from '../../features/game-session-store'
 import styles from './round-complete-panel.module.scss'
 
 export function RoundCompletePanel() {
-  const { phase, roundIndex, participants, scores, history, advanceRound, undo } =
+  const totalRounds = useGameDefinitionStore(({ definition }) => definition.rounds.length)
+  const { phase, roundIndex, participants, scores, history, advanceRound, startFinal, undo } =
     useGameSessionStore()
 
   if (phase !== 'roundComplete') return null
@@ -13,7 +14,7 @@ export function RoundCompletePanel() {
   const leaderboard = [...participants].sort(
     (first, second) => (scores[second.id] ?? 0) - (scores[first.id] ?? 0),
   )
-  const hasNextRound = roundIndex + 1 < DEFAULT_GAME_DEFINITION.rounds.length
+  const hasNextRound = roundIndex + 1 < totalRounds
 
   return (
     <Dialog.Root open>
@@ -30,7 +31,7 @@ export function RoundCompletePanel() {
           <Dialog.Description id="round-complete-description">
             {hasNextRound
               ? 'Проверьте текущий счёт перед переходом к следующему раунду.'
-              : 'Основная игра завершена. Финальный раунд появится на следующем этапе разработки.'}
+              : 'Основная игра завершена. Участники с положительным счётом проходят в финал.'}
           </Dialog.Description>
 
           <ol className={styles.leaderboard} aria-label="Результаты раунда">
@@ -52,11 +53,13 @@ export function RoundCompletePanel() {
             >
               ↶ Отменить последнее действие
             </button>
-            {hasNextRound && (
-              <button className={styles.nextButton} type="button" onClick={advanceRound}>
-                Перейти к раунду {roundIndex + 2} →
-              </button>
-            )}
+            <button
+              className={styles.nextButton}
+              type="button"
+              onClick={hasNextRound ? advanceRound : startFinal}
+            >
+              {hasNextRound ? `Перейти к раунду ${roundIndex + 2} →` : 'Перейти к финалу →'}
+            </button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

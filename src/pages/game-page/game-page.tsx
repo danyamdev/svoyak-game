@@ -1,12 +1,14 @@
 import { Link, Navigate } from 'react-router-dom'
 
-import { DEFAULT_GAME_DEFINITION } from '../../domain/game'
+import { useGameDefinitionStore } from '../../features/game-definition-store'
 import { useGameSessionStore } from '../../features/game-session-store'
+import { FinalPanel } from '../../widgets/final-panel'
 import { QuestionPanel } from '../../widgets/question-panel'
 import { RoundCompletePanel } from '../../widgets/round-complete-panel'
 import styles from './game-page.module.scss'
 
 export function GamePage() {
+  const definition = useGameDefinitionStore(({ definition }) => definition)
   const {
     status,
     participants,
@@ -22,7 +24,7 @@ export function GamePage() {
     return <Navigate to="/setup" replace />
   }
 
-  const round = DEFAULT_GAME_DEFINITION.rounds[roundIndex]
+  const round = definition.rounds[roundIndex]
 
   return (
     <main className={styles.page}>
@@ -99,6 +101,7 @@ export function GamePage() {
       </section>
       <QuestionPanel />
       <RoundCompletePanel />
+      <FinalPanel />
     </main>
   )
 }

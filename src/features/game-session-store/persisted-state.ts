@@ -52,6 +52,17 @@ const activeQuestionSchema = legacyActiveQuestionV3Schema.extend({
     .nullable(),
 })
 
+const finalStateSchema = z.object({
+  themeIds: z.array(z.string().min(1)),
+  eliminatedThemeIds: z.array(z.string().min(1)),
+  selectedThemeId: z.string().min(1).nullable(),
+  eligibleParticipantIds: z.array(z.string().min(1)),
+  wagers: z.record(z.string(), z.number().int().positive()),
+  judgedParticipantIds: z.array(z.string().min(1)),
+  tieParticipantIds: z.array(z.string().min(1)),
+  winnerParticipantIds: z.array(z.string().min(1)),
+})
+
 const runtimePhaseSchema = z.enum([
   'board',
   'catSetup',
@@ -60,6 +71,13 @@ const runtimePhaseSchema = z.enum([
   'judging',
   'answerReveal',
   'roundComplete',
+  'finalThemeSelection',
+  'finalWager',
+  'finalQuestion',
+  'finalJudging',
+  'tieBreakerQuestion',
+  'tieBreakerJudging',
+  'results',
 ])
 
 const runtimeSnapshotSchema = z.object({
@@ -69,10 +87,11 @@ const runtimeSnapshotSchema = z.object({
   usedQuestionIds: z.array(z.string().min(1)),
   activeQuestion: activeQuestionSchema.nullable(),
   selectorParticipantId: z.string().min(1).nullable(),
+  finalState: finalStateSchema.nullable(),
 })
 
 export const persistedGameStateSchema = z.object({
-  schemaVersion: z.literal(4),
+  schemaVersion: z.literal(5),
   mode: z.enum(['individual', 'team']),
   participants: z.array(participantDraftSchema).min(2).max(5),
   scores: z.record(z.string(), z.number().int()),
@@ -82,6 +101,7 @@ export const persistedGameStateSchema = z.object({
   usedQuestionIds: z.array(z.string().min(1)),
   activeQuestion: activeQuestionSchema.nullable(),
   selectorParticipantId: z.string().min(1).nullable(),
+  finalState: finalStateSchema.nullable(),
   history: z.array(runtimeSnapshotSchema).max(50),
 })
 
@@ -98,18 +118,21 @@ const legacyStateV1Schema = z.object({
 const legacyRuntimeSnapshotV2Schema = runtimeSnapshotSchema.extend({
   phase: z.enum(['board', 'question', 'judging', 'answerReveal', 'roundComplete']),
   activeQuestion: legacyActiveQuestionV2Schema.nullable(),
+  finalState: z.null().optional(),
 })
 
 const legacyStateV2Schema = persistedGameStateSchema.extend({
   schemaVersion: z.literal(2),
   phase: z.enum(['setup', 'board', 'question', 'judging', 'answerReveal', 'roundComplete']),
   activeQuestion: legacyActiveQuestionV2Schema.nullable(),
+  finalState: z.null().optional(),
   history: z.array(legacyRuntimeSnapshotV2Schema).max(50),
 })
 
 const legacyRuntimeSnapshotV3Schema = runtimeSnapshotSchema.extend({
   phase: z.enum(['board', 'catSetup', 'question', 'judging', 'answerReveal', 'roundComplete']),
   activeQuestion: legacyActiveQuestionV3Schema.nullable(),
+  finalState: z.null().optional(),
 })
 
 const legacyStateV3Schema = persistedGameStateSchema.extend({
@@ -124,7 +147,37 @@ const legacyStateV3Schema = persistedGameStateSchema.extend({
     'roundComplete',
   ]),
   activeQuestion: legacyActiveQuestionV3Schema.nullable(),
+  finalState: z.null().optional(),
   history: z.array(legacyRuntimeSnapshotV3Schema).max(50),
+})
+
+const legacyRuntimeSnapshotV4Schema = runtimeSnapshotSchema.extend({
+  phase: z.enum([
+    'board',
+    'catSetup',
+    'auctionSetup',
+    'question',
+    'judging',
+    'answerReveal',
+    'roundComplete',
+  ]),
+  finalState: z.null().optional(),
+})
+
+const legacyStateV4Schema = persistedGameStateSchema.extend({
+  schemaVersion: z.literal(4),
+  phase: z.enum([
+    'setup',
+    'board',
+    'catSetup',
+    'auctionSetup',
+    'question',
+    'judging',
+    'answerReveal',
+    'roundComplete',
+  ]),
+  finalState: z.null().optional(),
+  history: z.array(legacyRuntimeSnapshotV4Schema).max(50),
 })
 
 export type GameMode = z.infer<typeof persistedGameStateSchema.shape.mode>
@@ -133,17 +186,31 @@ export type PersistedGameState = z.infer<typeof persistedGameStateSchema>
 export type RuntimeSnapshot = z.infer<typeof runtimeSnapshotSchema>
 
 export function migratePersistedGameState(persistedState: unknown, version: number): unknown {
+  if (version === 4) {
+    const legacyState = legacyStateV4Schema.safeParse(persistedState)
+    if (!legacyState.success) return persistedState
+
+    return {
+      ...legacyState.data,
+      schemaVersion: 5,
+      finalState: null,
+      history: legacyState.data.history.map((snapshot) => ({ ...snapshot, finalState: null })),
+    }
+  }
+
   if (version === 3) {
     const legacyState = legacyStateV3Schema.safeParse(persistedState)
     if (!legacyState.success) return persistedState
 
     return {
       ...legacyState.data,
-      schemaVersion: 4,
+      schemaVersion: 5,
       activeQuestion: upgradeV3ActiveQuestion(legacyState.data.activeQuestion),
+      finalState: null,
       history: legacyState.data.history.map((snapshot) => ({
         ...snapshot,
         activeQuestion: upgradeV3ActiveQuestion(snapshot.activeQuestion),
+        finalState: null,
       })),
     }
   }
@@ -154,11 +221,13 @@ export function migratePersistedGameState(persistedState: unknown, version: numb
 
     return {
       ...legacyState.data,
-      schemaVersion: 4,
+      schemaVersion: 5,
       activeQuestion: upgradeV2ActiveQuestion(legacyState.data.activeQuestion),
+      finalState: null,
       history: legacyState.data.history.map((snapshot) => ({
         ...snapshot,
         activeQuestion: upgradeV2ActiveQuestion(snapshot.activeQuestion),
+        finalState: null,
       })),
     }
   }
@@ -170,10 +239,11 @@ export function migratePersistedGameState(persistedState: unknown, version: numb
 
   return {
     ...legacyState.data,
-    schemaVersion: 4,
+    schemaVersion: 5,
     usedQuestionIds: [],
     activeQuestion: null,
     selectorParticipantId: legacyState.data.participants[0]?.id ?? null,
+    finalState: null,
     history: [],
   }
 }
