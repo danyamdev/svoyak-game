@@ -9,6 +9,7 @@ interface RequiredTextFieldProps {
   rows?: number
   className?: string
   maxLength?: number
+  masked?: boolean
   onCommit: (value: string) => void
 }
 
@@ -19,11 +20,13 @@ export function RequiredTextField({
   rows = 2,
   className,
   maxLength,
+  masked = false,
   onCommit,
 }: RequiredTextFieldProps) {
   const errorId = useId()
   const [draft, setDraft] = useState(value)
   const [error, setError] = useState<string | null>(null)
+  const [isVisible, setVisible] = useState(!masked)
 
   function commit() {
     const nextValue = draft.trim()
@@ -53,7 +56,28 @@ export function RequiredTextField({
   return (
     <label className={className}>
       {label}
-      {multiline ? <textarea {...commonProps} rows={rows} /> : <input {...commonProps} />}
+      <span className={styles.fieldControl}>
+        {multiline ? (
+          <textarea
+            {...commonProps}
+            className={!isVisible ? styles.maskedValue : undefined}
+            rows={rows}
+          />
+        ) : (
+          <input {...commonProps} type={isVisible ? 'text' : 'password'} />
+        )}
+        {masked && (
+          <button
+            className={styles.visibilityButton}
+            type="button"
+            aria-label={isVisible ? `Скрыть: ${label}` : `Показать: ${label}`}
+            aria-pressed={isVisible}
+            onClick={() => setVisible((visible) => !visible)}
+          >
+            {isVisible ? '🙈' : '👁'}
+          </button>
+        )}
+      </span>
       {error && (
         <span className={styles.error} id={errorId} role="alert">
           {error}

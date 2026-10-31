@@ -4,6 +4,7 @@ import { Dialog } from 'radix-ui'
 import { findGameQuestion, getContentText } from '../../domain/game'
 import { useGameDefinitionStore } from '../../features/game-definition-store'
 import { useGameSessionStore } from '../../features/game-session-store'
+import { QuestionTimer } from '../question-timer'
 import styles from './question-panel.module.scss'
 
 export function QuestionPanel() {
@@ -19,8 +20,9 @@ export function QuestionPanel() {
     chooseAuctionWinner,
     chooseAuctionBid,
     chooseAnswerer,
-    markCorrect,
-    markIncorrect,
+    revealAnswer,
+    selectAnswerOutcome,
+    confirmAnswerOutcome,
     skipQuestion,
     continueAfterAnswer,
     undo,
@@ -34,9 +36,22 @@ export function QuestionPanel() {
   const activeParticipant = participants.find(({ id }) => id === activeQuestion.activeParticipantId)
   const prompt = getContentText(lookup.question.prompt)
   const answer = getContentText(lookup.question.answer)
+  const alternativeAnswers = lookup.question.acceptedAnswers
+    .filter((acceptedAnswer) => acceptedAnswer !== answer)
+    .map((acceptedAnswer) => ({
+      text: acceptedAnswer,
+      points: Math.min(
+        lookup.question.acceptedAnswerScores[acceptedAnswer] ?? lookup.question.price,
+        activeQuestion.price,
+      ),
+    }))
   const isCatSetup = phase === 'catSetup' && activeQuestion.type === 'cat'
   const isAuctionSetup = phase === 'auctionSetup' && activeQuestion.type === 'auction'
   const isSpecialSetup = isCatSetup || isAuctionSetup
+  const isCurrentAttemptConfirmed = Boolean(
+    activeParticipant &&
+    activeQuestion.attempts.some(({ participantId }) => participantId === activeParticipant.id),
+  )
 
   function submitAuctionBid(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -78,6 +93,8 @@ export function QuestionPanel() {
                   : 'Ведущий выбирает участника, который отвечает на вопрос.'}
             </Dialog.Description>
           </div>
+
+          {!isSpecialSetup && <QuestionTimer />}
 
           {isCatSetup && (
             <div className={styles.catSetup}>
@@ -193,14 +210,9 @@ export function QuestionPanel() {
               <p>
                 Отвечает: <strong>{activeParticipant.name}</strong>
               </p>
-              <div>
-                <button className={styles.incorrectButton} type="button" onClick={markIncorrect}>
-                  Неверно
-                </button>
-                <button className={styles.correctButton} type="button" onClick={markCorrect}>
-                  Верно
-                </button>
-              </div>
+              <button className={styles.revealButton} type="button" onClick={revealAnswer}>
+                Завершить приём ответа и показать варианты
+              </button>
             </div>
           )}
 
@@ -208,6 +220,63 @@ export function QuestionPanel() {
             <div className={styles.answerReveal}>
               <span>Правильный ответ</span>
               <p>{answer}</p>
+              {alternativeAnswers.length > 0 && (
+                <div className={styles.alternativeAnswers}>
+                  <span>Допустимые варианты</span>
+                  <ul>
+                    {alternativeAnswers.map(({ text, points }) => (
+                      <li key={text}>
+                        <span>{text}</span>
+                        <strong>+{points}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {activeParticipant && !isCurrentAttemptConfirmed && (
+                <div className={styles.outcomeSelection}>
+                  <p>Какой ответ дал {activeParticipant.name}?</p>
+                  <div>
+                    <button
+                      type="button"
+                      aria-pressed={activeQuestion.pendingOutcome?.result === 'incorrect'}
+                      onClick={() => selectAnswerOutcome('incorrect', -activeQuestion.price)}
+                    >
+                      Неверный · −{activeQuestion.price}
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={activeQuestion.pendingOutcome?.result === 'correct'}
+                      onClick={() => selectAnswerOutcome('correct', activeQuestion.price)}
+                    >
+                      Основной · +{activeQuestion.price}
+                    </button>
+                    {alternativeAnswers.map(({ text, points }) => (
+                      <button
+                        type="button"
+                        aria-pressed={
+                          activeQuestion.pendingOutcome?.result === 'accepted' &&
+                          activeQuestion.pendingOutcome.scoreDelta === points
+                        }
+                        key={text}
+                        onClick={() => selectAnswerOutcome('accepted', points)}
+                      >
+                        «{text}» · +{points}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className={styles.confirmOutcomeButton}
+                    type="button"
+                    disabled={!activeQuestion.pendingOutcome}
+                    onClick={confirmAnswerOutcome}
+                  >
+                    {activeQuestion.pendingOutcome
+                      ? `Подтвердить ${activeQuestion.pendingOutcome.scoreDelta > 0 ? '+' : ''}${activeQuestion.pendingOutcome.scoreDelta} очков`
+                      : 'Сначала выберите результат'}
+                  </button>
+                </div>
+              )}
               {activeQuestion.attempts.length > 0 && (
                 <ul>
                   {activeQuestion.attempts.map((attempt) => {
@@ -222,9 +291,11 @@ export function QuestionPanel() {
                   })}
                 </ul>
               )}
-              <button type="button" onClick={continueAfterAnswer}>
-                Вернуться к полю →
-              </button>
+              {(!activeParticipant || isCurrentAttemptConfirmed) && (
+                <button type="button" onClick={continueAfterAnswer}>
+                  Вернуться к полю →
+                </button>
+              )}
             </div>
           )}
         </Dialog.Content>

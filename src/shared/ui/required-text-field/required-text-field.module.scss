@@ -1,3 +1,31 @@
+.fieldControl {
+  position: relative;
+  display: block;
+
+  > input,
+  > textarea {
+    padding-right: 3rem;
+  }
+}
+
+.maskedValue {
+  -webkit-text-security: disc;
+}
+
+.visibilityButton {
+  position: absolute;
+  top: 0.45rem;
+  right: 0.45rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  background: rgb(10 4 28 / 72%);
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 0.45rem;
+  place-items: center;
+}
+
 .error {
   font-size: 0.7rem;
   font-weight: 750;

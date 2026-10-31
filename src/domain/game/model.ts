@@ -31,6 +31,7 @@ const questionBaseSchema = z.object({
   prompt: z.array(contentBlockSchema).min(1),
   answer: z.array(contentBlockSchema).min(1),
   acceptedAnswers: z.array(z.string().trim().min(1)).default([]),
+  acceptedAnswerScores: z.record(z.string(), z.number().int().nonnegative()).default({}),
   note: z.string().trim().optional(),
 })
 
@@ -47,22 +48,38 @@ const auctionQuestionSchema = questionBaseSchema.extend({
   type: z.literal('auction'),
 })
 
-export const questionSchema = z.discriminatedUnion('type', [
-  regularQuestionSchema,
-  catQuestionSchema,
-  auctionQuestionSchema,
-])
+export const questionSchema = z
+  .discriminatedUnion('type', [regularQuestionSchema, catQuestionSchema, auctionQuestionSchema])
+  .superRefine((question, context) => {
+    for (const [answer, points] of Object.entries(question.acceptedAnswerScores)) {
+      if (!question.acceptedAnswers.includes(answer)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['acceptedAnswerScores', answer],
+          message: 'Баллы можно назначить только допустимому ответу',
+        })
+      }
+
+      if (points > question.price) {
+        context.addIssue({
+          code: 'custom',
+          path: ['acceptedAnswerScores', answer],
+          message: 'Баллы допустимого ответа не могут превышать стоимость вопроса',
+        })
+      }
+    }
+  })
 
 export const categorySchema = z.object({
   id: idSchema,
   title: z.string().trim().min(1),
-  questions: z.array(questionSchema).length(5),
+  questions: z.array(questionSchema).min(1),
 })
 
 export const roundSchema = z.object({
   id: idSchema,
   title: z.string().trim().min(1),
-  categories: z.array(categorySchema).length(5),
+  categories: z.array(categorySchema).min(1),
 })
 
 export const finalThemeSchema = z.object({
@@ -90,7 +107,7 @@ export const gameDefinitionSchema = z.object({
   title: z.string().trim().min(1),
   rules: gameRulesSchema,
   rounds: z.array(roundSchema).length(3),
-  finalThemes: z.array(finalThemeSchema).length(7),
+  finalThemes: z.array(finalThemeSchema).min(1),
   tieBreakers: z.array(finalThemeSchema).min(1),
 })
 

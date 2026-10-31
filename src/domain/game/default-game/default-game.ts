@@ -147,6 +147,7 @@ function createQuestion(
     prompt: [{ type: 'text' as const, text: prompt }],
     answer: [{ type: 'text' as const, text: answer }],
     acceptedAnswers: [answer],
+    acceptedAnswerScores: {},
   }
 
   // В стартовом пакете по одному спецвопросу каждого типа; редактор позже изменит распределение.

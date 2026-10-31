@@ -13,7 +13,7 @@ const question = {
 } as const
 
 describe('gameDefinitionSchema', () => {
-  it('requires exactly five categories with five questions in each round', () => {
+  it('allows a configurable number of questions while requiring a non-empty category', () => {
     const validCategory = {
       id: 'category-1',
       title: 'Категория',
@@ -27,6 +27,23 @@ describe('gameDefinitionSchema', () => {
     expect(
       categorySchema.safeParse({ ...validCategory, questions: validCategory.questions.slice(1) })
         .success,
+    ).toBe(true)
+    expect(categorySchema.safeParse({ ...validCategory, questions: [] }).success).toBe(false)
+  })
+
+  it('rejects alternative-answer points outside the question value', () => {
+    expect(
+      categorySchema.safeParse({
+        id: 'category-1',
+        title: 'Категория',
+        questions: [
+          {
+            ...question,
+            acceptedAnswers: ['Ответ', 'Почти ответ'],
+            acceptedAnswerScores: { 'Почти ответ': 101 },
+          },
+        ],
+      }).success,
     ).toBe(false)
   })
 

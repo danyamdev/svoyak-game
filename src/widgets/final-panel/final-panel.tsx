@@ -26,6 +26,8 @@ export function FinalPanel() {
     scores,
     finalState,
     history,
+    areScoresVisible,
+    toggleScoresVisibility,
     eliminateFinalTheme,
     submitFinalWagers,
     openFinalQuestion,
@@ -67,6 +69,9 @@ export function FinalPanel() {
         >
           <header className={styles.header}>
             <span>Финальный раунд</span>
+            <button type="button" onClick={toggleScoresVisibility}>
+              {areScoresVisible ? 'Скрыть счёт' : 'Показать счёт'}
+            </button>
             {phase !== 'results' && (
               <button type="button" disabled={history.length === 0} onClick={undo}>
                 ↶ Отменить действие
@@ -78,7 +83,7 @@ export function FinalPanel() {
             <section className={styles.themeSelection}>
               <Dialog.Title>Оставьте одну тему</Dialog.Title>
               <Dialog.Description id="final-panel-description">
-                Ведущий по очереди исключает шесть тем финала.
+                Ведущий по очереди исключает темы, пока не останется одна.
               </Dialog.Description>
               <div className={styles.themeGrid}>
                 {definition.finalThemes.map((theme) => {
@@ -113,7 +118,8 @@ export function FinalPanel() {
                 {eligibleParticipants.map((participant) => (
                   <label key={participant.id}>
                     <span>
-                      {participant.name} · счёт {scores[participant.id] ?? 0}
+                      {participant.name} · счёт{' '}
+                      {areScoresVisible ? (scores[participant.id] ?? 0) : 'скрыт'}
                     </span>
                     <input
                       name={`wager-${participant.id}`}
@@ -227,6 +233,7 @@ export function FinalPanel() {
               participants={participants}
               scores={scores}
               winnerParticipantIds={finalState.winnerParticipantIds}
+              areScoresVisible={areScoresVisible}
               restartSession={restartSession}
             />
           )}
@@ -240,10 +247,17 @@ interface ResultsProps {
   participants: { id: string; name: string }[]
   scores: Record<string, number>
   winnerParticipantIds: string[]
+  areScoresVisible: boolean
   restartSession: () => void
 }
 
-function Results({ participants, scores, winnerParticipantIds, restartSession }: ResultsProps) {
+function Results({
+  participants,
+  scores,
+  winnerParticipantIds,
+  areScoresVisible,
+  restartSession,
+}: ResultsProps) {
   const [isRestartConfirmationOpen, setRestartConfirmationOpen] = useState(false)
   const leaderboard = [...participants].sort(
     (first, second) => (scores[second.id] ?? 0) - (scores[first.id] ?? 0),
@@ -259,7 +273,7 @@ function Results({ participants, scores, winnerParticipantIds, restartSession }:
           <li key={participant.id}>
             <span>{index + 1}</span>
             <strong>{participant.name}</strong>
-            <span>{scores[participant.id] ?? 0}</span>
+            <span>{areScoresVisible ? (scores[participant.id] ?? 0) : '••••'}</span>
           </li>
         ))}
       </ol>

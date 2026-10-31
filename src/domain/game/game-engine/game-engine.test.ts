@@ -40,6 +40,7 @@ describe('transitionGame', () => {
       questionType: 'regular',
       price: 100,
       catPriceOptions: null,
+      acceptedAnswerScores: [],
       participantIds: ['player1', 'player2'],
     })
     const judgingState = transitionGame(questionState, {
@@ -60,13 +61,20 @@ describe('transitionGame', () => {
       questionType: 'regular',
       price: 100,
       catPriceOptions: null,
+      acceptedAnswerScores: [],
       participantIds: ['player1', 'player2'],
     })
     const judgingState = transitionGame(questionState, {
       type: 'answererChosen',
       participantId: 'player1',
     })
-    const result = transitionGame(judgingState, { type: 'answerMarkedIncorrect' })
+    const answerState = transitionGame(judgingState, { type: 'answerRevealed' })
+    const selectedState = transitionGame(answerState, {
+      type: 'answerOutcomeSelected',
+      result: 'incorrect',
+      scoreDelta: -100,
+    })
+    const result = transitionGame(selectedState, { type: 'answerOutcomeConfirmed' })
 
     expect(result.scores.player1).toBe(-100)
     expect(result.phase).toBe('question')
@@ -80,17 +88,69 @@ describe('transitionGame', () => {
       questionType: 'regular',
       price: 200,
       catPriceOptions: null,
+      acceptedAnswerScores: [],
       participantIds: ['player1', 'player2'],
     })
     const judgingState = transitionGame(questionState, {
       type: 'answererChosen',
       participantId: 'player2',
     })
-    const result = transitionGame(judgingState, { type: 'answerMarkedCorrect' })
+    const answerState = transitionGame(judgingState, { type: 'answerRevealed' })
+    const selectedState = transitionGame(answerState, {
+      type: 'answerOutcomeSelected',
+      result: 'correct',
+      scoreDelta: 200,
+    })
+    const result = transitionGame(selectedState, { type: 'answerOutcomeConfirmed' })
 
     expect(result.scores.player2).toBe(200)
     expect(result.selectorParticipantId).toBe('player2')
     expect(result.phase).toBe('answerReveal')
+  })
+
+  it('applies only a configured partial score after explicit confirmation', () => {
+    const questionState = transitionGame(initialState, {
+      type: 'questionSelected',
+      questionId: 'q1',
+      questionType: 'regular',
+      price: 500,
+      catPriceOptions: null,
+      acceptedAnswerScores: [300, 100],
+      participantIds: ['player1', 'player2'],
+    })
+    const judgingState = transitionGame(questionState, {
+      type: 'answererChosen',
+      participantId: 'player1',
+    })
+    const answerState = transitionGame(judgingState, { type: 'answerRevealed' })
+    const selectedState = transitionGame(answerState, {
+      type: 'answerOutcomeSelected',
+      result: 'accepted',
+      scoreDelta: 300,
+    })
+
+    expect(selectedState.scores.player1).toBe(0)
+    expect(
+      transitionGame(answerState, {
+        type: 'answerOutcomeSelected',
+        result: 'accepted',
+        scoreDelta: 400,
+      }),
+    ).toBe(answerState)
+
+    const tamperedState: GameRuntimeState = {
+      ...answerState,
+      activeQuestion: answerState.activeQuestion
+        ? {
+            ...answerState.activeQuestion,
+            pendingOutcome: { result: 'accepted', scoreDelta: 400 },
+          }
+        : null,
+    }
+    expect(transitionGame(tamperedState, { type: 'answerOutcomeConfirmed' })).toBe(tamperedState)
+
+    const result = transitionGame(selectedState, { type: 'answerOutcomeConfirmed' })
+    expect(result.scores.player1).toBe(300)
   })
 
   it('finishes a round after its final question is closed', () => {
@@ -107,6 +167,8 @@ describe('transitionGame', () => {
         eligibleParticipantIds: ['player1'],
         activeParticipantId: null,
         attempts: [],
+        acceptedAnswerScores: [],
+        pendingOutcome: null,
       },
     }
 
@@ -134,6 +196,7 @@ describe('transitionGame', () => {
       questionType: 'cat',
       price: 300,
       catPriceOptions: [100, 500],
+      acceptedAnswerScores: [],
       participantIds: ['player1', 'player2'],
     })
     const recipientState = transitionGame(catState, {
@@ -159,6 +222,7 @@ describe('transitionGame', () => {
       questionType: 'cat',
       price: 300,
       catPriceOptions: [100, 500],
+      acceptedAnswerScores: [],
       participantIds: ['player1', 'player2'],
     })
     const recipientState = transitionGame(catState, {
@@ -180,6 +244,7 @@ describe('transitionGame', () => {
         questionType: 'auction',
         price: 500,
         catPriceOptions: null,
+        acceptedAnswerScores: [],
         participantIds: ['player1', 'player2'],
       },
     )
@@ -208,6 +273,7 @@ describe('transitionGame', () => {
         questionType: 'auction',
         price: 500,
         catPriceOptions: null,
+        acceptedAnswerScores: [],
         participantIds: ['player1', 'player2'],
       },
     )

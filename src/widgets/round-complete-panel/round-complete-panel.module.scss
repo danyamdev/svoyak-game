@@ -50,6 +50,16 @@
   letter-spacing: 0.12em;
 }
 
+.visibilityButton {
+  padding: 0.55rem 0.75rem;
+  margin-top: 0.8rem;
+  font-weight: 850;
+  color: var(--color-cream);
+  background: rgb(255 255 255 / 8%);
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 0.6rem;
+}
+
 .leaderboard {
   display: grid;
   gap: 0.55rem;

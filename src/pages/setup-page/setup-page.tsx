@@ -3,12 +3,14 @@ import { Link, useNavigate } from 'react-router-dom'
 
 import { useGameSessionStore, type GameMode } from '../../features/game-session-store'
 import { ConfirmationDialog } from '../../shared/ui/confirmation-dialog'
+import { SpecialRulesDialog } from '../../widgets/special-rules-dialog'
 import styles from './setup-page.module.scss'
 
 export function SetupPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [isResetConfirmationOpen, setResetConfirmationOpen] = useState(false)
+  const [isRulesOpen, setRulesOpen] = useState(false)
   const {
     mode,
     participants,
@@ -20,7 +22,7 @@ export function SetupPage() {
     removeTeamMember,
     renameTeamMember,
     startSession,
-    resetSession,
+    resetGame,
   } = useGameSessionStore()
 
   function handleModeChange(nextMode: GameMode) {
@@ -31,13 +33,19 @@ export function SetupPage() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setRulesOpen(true)
+  }
+
+  function startConfiguredGame() {
     const result = startSession()
 
     if (!result.success) {
       setError(result.message ?? 'Не удалось начать игру')
+      setRulesOpen(false)
       return
     }
 
+    setRulesOpen(false)
     void navigate('/game')
   }
 
@@ -184,11 +192,16 @@ export function SetupPage() {
         description="Будут удалены текущий счёт, прогресс раундов и настройки участников. Отменить это действие будет нельзя."
         confirmLabel="Сбросить игру"
         onConfirm={() => {
-          resetSession()
+          resetGame()
           setError(null)
           setResetConfirmationOpen(false)
         }}
         onOpenChange={setResetConfirmationOpen}
+      />
+      <SpecialRulesDialog
+        open={isRulesOpen}
+        onOpenChange={setRulesOpen}
+        onStart={startConfiguredGame}
       />
     </main>
   )

@@ -1,0 +1,37 @@
+.field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hint {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: rgb(255 243 214 / 48%);
+}
+
+.control {
+  position: relative;
+  display: block;
+
+  textarea {
+    padding-right: 3rem;
+  }
+
+  button {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.45rem;
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    background: rgb(10 4 28 / 72%);
+    border: 1px solid rgb(255 255 255 / 18%);
+    border-radius: 0.45rem;
+    place-items: center;
+  }
+}
+
+.maskedValue {
+  -webkit-text-security: disc;
+}

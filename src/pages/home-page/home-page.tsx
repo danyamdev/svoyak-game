@@ -3,11 +3,9 @@ import { Link } from 'react-router-dom'
 import { useGameSessionStore } from '../../features/game-session-store'
 import styles from './home-page.module.scss'
 
-const previewCategories = ['Призраки', 'Зелья', 'Проклятия']
-const previewPrices = [100, 200, 300, 400, 500]
-
 export function HomePage() {
   const hasActiveSession = useGameSessionStore(({ status }) => status === 'active')
+  const resetGame = useGameSessionStore(({ resetGame }) => resetGame)
 
   return (
     <main className={styles.page}>
@@ -18,26 +16,22 @@ export function HomePage() {
       </div>
 
       <header className={styles.header}>
-        <a className={styles.brand} href="/" aria-label="Своя игра — главная">
+        <Link className={styles.brand} to="/" aria-label="Своя игра — главная">
           <span className={styles.brandIcon} aria-hidden="true">
             🎃
           </span>
           <span>Своя игра</span>
-        </a>
+        </Link>
         <span className={styles.themeBadge}>Хэллоуин-вечеринка</span>
       </header>
 
       <section className={styles.hero}>
         <div className={styles.intro}>
           <p className={styles.eyebrow}>Интеллектуальная викторина</p>
-          <h1>Знания, азарт и немного магии</h1>
-          <p className={styles.description}>
-            Соберите до пяти игроков или команд, подготовьте вопросы и проведите свою незабываемую
-            игру.
-          </p>
+          <h1>Мозги на стол! Начинаем Свояк!</h1>
 
           <div className={styles.actions}>
-            <Link className={styles.primaryAction} to="/setup">
+            <Link className={styles.primaryAction} to="/setup" onClick={resetGame}>
               Создать игру
               <span aria-hidden="true">→</span>
             </Link>
@@ -52,39 +46,17 @@ export function HomePage() {
 
           <ul className={styles.features} aria-label="Возможности игры">
             <li>3 раунда</li>
-            <li>Поле 5 × 5</li>
+            <li>Спецвопросы</li>
             <li>Игроки и команды</li>
           </ul>
         </div>
 
-        <div className={styles.boardShell} aria-label="Предварительный вид игрового поля">
-          <div className={styles.scoreRow}>
-            <div className={styles.scoreCard}>
-              <span aria-hidden="true">🎃</span>
-              <span>Анна</span>
-              <strong>1200</strong>
-            </div>
-            <div className={styles.scoreCard}>
-              <span aria-hidden="true">👻</span>
-              <span>Марк</span>
-              <strong>900</strong>
-            </div>
-          </div>
-
-          <div className={styles.board}>
-            <p className={styles.roundTitle}>Раунд 1</p>
-            {previewCategories.map((category) => (
-              <div className={styles.boardRow} key={category}>
-                <span className={styles.category}>{category}</span>
-                {previewPrices.map((price) => (
-                  <span className={styles.price} key={price}>
-                    {price}
-                  </span>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
+        <figure className={styles.heroIllustration}>
+          <img
+            src="/assets/skeleton-quiz-host.png"
+            alt="Весёлый скелет-ведущий, призрак и светящаяся тыква приглашают на викторину"
+          />
+        </figure>
       </section>
     </main>
   )

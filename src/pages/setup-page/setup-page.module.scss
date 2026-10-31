@@ -80,12 +80,23 @@
 }
 
 .form {
+  position: relative;
   padding: clamp(1rem, 3vw, 2rem);
   margin-top: 2.5rem;
   background: rgb(23 9 52 / 76%);
   border: 1px solid rgb(255 255 255 / 12%);
   border-radius: 1.5rem;
   box-shadow: var(--shadow-card);
+
+  &::before {
+    position: absolute;
+    top: -1rem;
+    right: 1rem;
+    font-size: 2rem;
+    content: '🕸️';
+    opacity: 0.55;
+    rotate: 12deg;
+  }
 }
 
 .modePicker {
@@ -134,10 +145,38 @@
 }
 
 .participantCard {
+  position: relative;
   padding: 1rem;
   background: rgb(255 255 255 / 6%);
   border: 1px solid rgb(255 255 255 / 10%);
   border-radius: 1rem;
+
+  &::after {
+    position: absolute;
+    top: 0.45rem;
+    right: 0.55rem;
+    font-size: 1rem;
+    content: '🎃';
+    opacity: 0.34;
+    filter: drop-shadow(0 0 0.35rem var(--color-orange));
+    animation: card-pumpkin-glow 3.5s ease-in-out infinite;
+  }
+
+  &:nth-child(even) {
+    border-color: rgb(36 199 217 / 28%);
+
+    &::after {
+      content: '👻';
+      filter: drop-shadow(0 0 0.35rem var(--color-cyan));
+    }
+  }
+}
+
+@keyframes card-pumpkin-glow {
+  50% {
+    opacity: 0.7;
+    transform: translateY(-0.15rem);
+  }
 }
 
 .participantHeader {
@@ -363,5 +402,11 @@
 
   .startButton {
     justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .participantCard::after {
+    animation: none;
   }
 }

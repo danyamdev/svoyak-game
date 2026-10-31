@@ -13,6 +13,7 @@ import {
   type GameMode,
   type ParticipantDraft,
   type PersistedGameState,
+  type QuestionTimerState,
   type RuntimeSnapshot,
   migratePersistedGameState,
   restorePersistedGameState,
@@ -22,6 +23,16 @@ const STORAGE_KEY = 'svoyak-game-state'
 const MAX_PARTICIPANTS = 5
 const MAX_TEAM_MEMBERS = 5
 const MAX_HISTORY_LENGTH = 50
+const DEFAULT_TIMER_SECONDS = 30
+
+function createInitialTimer(durationSeconds = DEFAULT_TIMER_SECONDS): QuestionTimerState {
+  return {
+    durationSeconds,
+    status: 'idle',
+    remainingMs: durationSeconds * 1000,
+    endsAt: null,
+  }
+}
 
 function createId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`
@@ -58,6 +69,8 @@ function createInitialState(mode: GameMode = 'individual'): PersistedGameState {
     selectorParticipantId: null,
     finalState: null,
     history: [],
+    areScoresVisible: false,
+    questionTimer: createInitialTimer(),
   }
 }
 
@@ -97,14 +110,21 @@ interface GameSessionActions {
   renameTeamMember: (teamId: string, memberId: string, name: string) => void
   startSession: () => StartSessionResult
   changeScore: (participantId: string, delta: number) => void
+  toggleScoresVisibility: () => void
+  setTimerDuration: (seconds: number) => void
+  startTimer: () => void
+  pauseTimer: () => void
+  resetTimer: () => void
+  expireTimer: () => void
   selectQuestion: (questionId: string) => void
   chooseCatRecipient: (participantId: string) => void
   chooseCatPrice: (price: number) => void
   chooseAuctionWinner: (participantId: string) => void
   chooseAuctionBid: (bid: number) => void
   chooseAnswerer: (participantId: string) => void
-  markCorrect: () => void
-  markIncorrect: () => void
+  revealAnswer: () => void
+  selectAnswerOutcome: (result: 'correct' | 'accepted' | 'incorrect', scoreDelta: number) => void
+  confirmAnswerOutcome: () => void
   skipQuestion: () => void
   continueAfterAnswer: () => void
   advanceRound: () => void
@@ -118,7 +138,7 @@ interface GameSessionActions {
   chooseTieBreakerWinner: (participantId: string) => void
   restartSession: () => void
   undo: () => void
-  resetSession: () => void
+  resetGame: () => void
 }
 
 export type GameSessionStore = PersistedGameState & GameSessionActions
@@ -223,12 +243,70 @@ export const useGameSessionStore = create<GameSessionStore>()(
             selectorParticipantId: result.data[0]?.id ?? null,
             finalState: null,
             history: [],
+            areScoresVisible: false,
+            questionTimer: createInitialTimer(),
           })
 
           return { success: true }
         },
         changeScore: (participantId, delta) =>
           dispatch({ type: 'scoreAdjusted', participantId, delta }),
+        toggleScoresVisibility: () =>
+          set(({ areScoresVisible }) => ({ areScoresVisible: !areScoresVisible })),
+        setTimerDuration: (seconds) => {
+          if (!Number.isInteger(seconds) || seconds < 5 || seconds > 300) return
+          set({ questionTimer: createInitialTimer(seconds) })
+        },
+        startTimer: () =>
+          set(({ questionTimer }) => {
+            const remainingMs =
+              questionTimer.remainingMs > 0
+                ? questionTimer.remainingMs
+                : questionTimer.durationSeconds * 1000
+            return {
+              questionTimer: {
+                ...questionTimer,
+                status: 'running',
+                remainingMs,
+                endsAt: Date.now() + remainingMs,
+              },
+            }
+          }),
+        pauseTimer: () =>
+          set(({ questionTimer }) => {
+            if (questionTimer.status !== 'running' || !questionTimer.endsAt) return {}
+            return {
+              questionTimer: {
+                ...questionTimer,
+                status: 'paused',
+                remainingMs: Math.max(0, questionTimer.endsAt - Date.now()),
+                endsAt: null,
+              },
+            }
+          }),
+        resetTimer: () =>
+          set(({ questionTimer }) => ({
+            questionTimer: createInitialTimer(questionTimer.durationSeconds),
+          })),
+        expireTimer: () =>
+          set(({ questionTimer }) => {
+            if (
+              questionTimer.status !== 'running' ||
+              !questionTimer.endsAt ||
+              questionTimer.endsAt > Date.now()
+            ) {
+              return {}
+            }
+
+            return {
+              questionTimer: {
+                ...questionTimer,
+                status: 'expired',
+                remainingMs: 0,
+                endsAt: null,
+              },
+            }
+          }),
         selectQuestion: (questionId) => {
           const definition = getGameDefinition()
           const lookup = findGameQuestion(definition, questionId)
@@ -248,8 +326,12 @@ export const useGameSessionStore = create<GameSessionStore>()(
             questionType: lookup.question.type,
             price: lookup.question.price,
             catPriceOptions: lookup.question.type === 'cat' ? catPriceOptions : null,
+            acceptedAnswerScores: Object.values(lookup.question.acceptedAnswerScores),
             participantIds: get().participants.map(({ id }) => id),
           })
+          set(({ questionTimer }) => ({
+            questionTimer: createInitialTimer(questionTimer.durationSeconds),
+          }))
         },
         chooseCatRecipient: (participantId) =>
           dispatch({ type: 'catRecipientChosen', participantId }),
@@ -258,8 +340,23 @@ export const useGameSessionStore = create<GameSessionStore>()(
           dispatch({ type: 'auctionWinnerChosen', participantId }),
         chooseAuctionBid: (bid) => dispatch({ type: 'auctionBidChosen', bid }),
         chooseAnswerer: (participantId) => dispatch({ type: 'answererChosen', participantId }),
-        markCorrect: () => dispatch({ type: 'answerMarkedCorrect' }),
-        markIncorrect: () => dispatch({ type: 'answerMarkedIncorrect' }),
+        revealAnswer: () => {
+          dispatch({ type: 'answerRevealed' })
+          const { questionTimer } = get()
+          if (questionTimer.status === 'running' && questionTimer.endsAt) {
+            set({
+              questionTimer: {
+                ...questionTimer,
+                status: 'paused',
+                remainingMs: Math.max(0, questionTimer.endsAt - Date.now()),
+                endsAt: null,
+              },
+            })
+          }
+        },
+        selectAnswerOutcome: (result, scoreDelta) =>
+          dispatch({ type: 'answerOutcomeSelected', result, scoreDelta }),
+        confirmAnswerOutcome: () => dispatch({ type: 'answerOutcomeConfirmed' }),
         skipQuestion: () => dispatch({ type: 'questionSkipped' }),
         continueAfterAnswer: () =>
           dispatch({
@@ -300,6 +397,8 @@ export const useGameSessionStore = create<GameSessionStore>()(
             selectorParticipantId: participants[0]?.id ?? null,
             finalState: null,
             history: [],
+            areScoresVisible: false,
+            questionTimer: createInitialTimer(),
           })
         },
         undo: () => {
@@ -312,7 +411,7 @@ export const useGameSessionStore = create<GameSessionStore>()(
             history: state.history.slice(0, -1),
           })
         },
-        resetSession: () => set(createInitialState(get().mode)),
+        resetGame: () => set(createInitialState()),
       }
     },
     {
@@ -333,6 +432,8 @@ export const useGameSessionStore = create<GameSessionStore>()(
         selectorParticipantId,
         finalState,
         history,
+        areScoresVisible,
+        questionTimer,
       }) => ({
         schemaVersion,
         mode,
@@ -346,6 +447,8 @@ export const useGameSessionStore = create<GameSessionStore>()(
         selectorParticipantId,
         finalState,
         history,
+        areScoresVisible,
+        questionTimer,
       }),
       merge: (persistedState, currentState) => ({
         ...currentState,

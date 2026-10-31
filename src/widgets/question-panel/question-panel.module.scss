@@ -270,14 +270,9 @@
   }
 }
 
-.incorrectButton {
-  color: var(--color-cream);
-  background: var(--color-pink);
-}
-
-.correctButton {
+.revealButton {
   color: var(--color-ink);
-  background: var(--color-lime);
+  background: var(--color-orange);
 }
 
 .answerReveal {
@@ -330,6 +325,77 @@
     background: var(--color-orange);
     border: 0;
     border-radius: 0.75rem;
+  }
+}
+
+.alternativeAnswers {
+  display: grid;
+  gap: 0.45rem;
+
+  > span {
+    font-size: 0.7rem;
+    font-weight: 850;
+    color: rgb(255 243 214 / 62%);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  li {
+    display: flex;
+    gap: 0.45rem;
+    align-items: center;
+
+    strong {
+      color: var(--color-lime);
+    }
+  }
+}
+
+.outcomeSelection {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  background: rgb(10 4 28 / 36%);
+  border-radius: 0.75rem;
+
+  p {
+    margin: 0;
+    font-weight: 850;
+  }
+
+  > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: center;
+
+    button {
+      padding: 0.55rem 0.7rem;
+      color: var(--color-cream);
+      background: #39126e;
+      border: 1px solid rgb(255 255 255 / 16%);
+      border-radius: 0.55rem;
+
+      &[aria-pressed='true'] {
+        color: var(--color-ink);
+        background: var(--color-lime);
+      }
+    }
+  }
+}
+
+.confirmOutcomeButton {
+  justify-self: center;
+  padding: 0.7rem 0.9rem;
+  font-weight: 900;
+  color: var(--color-ink);
+  background: var(--color-orange);
+  border: 0;
+  border-radius: 0.6rem;
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 }
 

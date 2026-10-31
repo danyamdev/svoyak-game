@@ -32,31 +32,34 @@ export function ScoreControls({ participantId, participantName }: ScoreControlsP
   }
 
   return (
-    <div className={styles.controls} aria-label={`Изменить счёт: ${participantName}`}>
-      <div className={styles.quickActions}>
-        <button type="button" onClick={() => adjustBy(-100)}>
-          −100
-        </button>
-        <button type="button" onClick={() => adjustBy(100)}>
-          +100
-        </button>
+    <details className={styles.controls}>
+      <summary>Корректировка очков</summary>
+      <div aria-label={`Изменить счёт: ${participantName}`}>
+        <div className={styles.quickActions}>
+          <button type="button" onClick={() => adjustBy(-100)}>
+            Списать 100
+          </button>
+          <button type="button" onClick={() => adjustBy(100)}>
+            Добавить 100
+          </button>
+        </div>
+        <form onSubmit={submitAdjustment}>
+          <input
+            name="scoreDelta"
+            type="number"
+            step="1"
+            placeholder="Например, −250"
+            aria-label={`Корректировка счёта: ${participantName}`}
+            required
+          />
+          <button type="submit">Применить</button>
+        </form>
+        {error && (
+          <span className={styles.error} role="alert">
+            {error}
+          </span>
+        )}
       </div>
-      <form onSubmit={submitAdjustment}>
-        <input
-          name="scoreDelta"
-          type="number"
-          step="1"
-          placeholder="Например, −250"
-          aria-label={`Корректировка счёта: ${participantName}`}
-          required
-        />
-        <button type="submit">Применить</button>
-      </form>
-      {error && (
-        <span className={styles.error} role="alert">
-          {error}
-        </span>
-      )}
-    </div>
+    </details>
   )
 }

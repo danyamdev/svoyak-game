@@ -41,7 +41,7 @@ async function expectNamedVisibleFormControls(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/#/setup')
+  await page.goto('/setup')
   await page.evaluate(() => localStorage.clear())
   await page.reload()
 })
@@ -54,7 +54,7 @@ test('key screens fit target viewports and expose named controls', async ({ page
   ]) {
     await page.setViewportSize(viewport)
 
-    for (const route of ['/#/', '/#/setup', '/#/editor']) {
+    for (const route of ['/', '/setup', '/editor']) {
       await page.goto(route)
       await expectNoHorizontalOverflow(page)
       await expectNamedVisibleButtons(page)
@@ -65,8 +65,12 @@ test('key screens fit target viewports and expose named controls', async ({ page
   }
 
   await page.setViewportSize({ width: 320, height: 700 })
-  await page.goto('/#/setup')
+  await page.goto('/setup')
   await page.getByRole('button', { name: /Начать игру/ }).click()
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /Всё понятно/ })
+    .click()
   await expectNoHorizontalOverflow(page)
   await expectNamedVisibleButtons(page)
 
@@ -76,6 +80,10 @@ test('key screens fit target viewports and expose named controls', async ({ page
 
 test('question dialog keeps keyboard focus and cannot close with Escape', async ({ page }) => {
   await page.getByRole('button', { name: /Начать игру/ }).click()
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /Всё понятно/ })
+    .click()
   await page.locator('button[aria-label*=" за "]:not(:disabled)').first().click()
 
   const dialog = page.getByRole('dialog')

@@ -7,4 +7,5 @@ export {
   type ParticipantDraft,
   type PersistedGameState,
   type RuntimeSnapshot,
+  type QuestionTimerState,
 } from './persisted-state'

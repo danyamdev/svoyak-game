@@ -6,8 +6,18 @@ import styles from './round-complete-panel.module.scss'
 
 export function RoundCompletePanel() {
   const totalRounds = useGameDefinitionStore(({ definition }) => definition.rounds.length)
-  const { phase, roundIndex, participants, scores, history, advanceRound, startFinal, undo } =
-    useGameSessionStore()
+  const {
+    phase,
+    roundIndex,
+    participants,
+    scores,
+    history,
+    areScoresVisible,
+    toggleScoresVisibility,
+    advanceRound,
+    startFinal,
+    undo,
+  } = useGameSessionStore()
 
   if (phase !== 'roundComplete') return null
 
@@ -33,13 +43,22 @@ export function RoundCompletePanel() {
               ? 'Проверьте текущий счёт перед переходом к следующему раунду.'
               : 'Основная игра завершена. Участники с положительным счётом проходят в финал.'}
           </Dialog.Description>
+          <button
+            className={styles.visibilityButton}
+            type="button"
+            onClick={toggleScoresVisibility}
+          >
+            {areScoresVisible ? 'Скрыть счёт' : 'Показать счёт'}
+          </button>
 
           <ol className={styles.leaderboard} aria-label="Результаты раунда">
             {leaderboard.map((participant, index) => (
               <li key={participant.id}>
                 <span className={styles.position}>{index + 1}</span>
                 <strong>{participant.name}</strong>
-                <span className={styles.score}>{scores[participant.id] ?? 0}</span>
+                <span className={styles.score}>
+                  {areScoresVisible ? (scores[participant.id] ?? 0) : '••••'}
+                </span>
               </li>
             ))}
           </ol>

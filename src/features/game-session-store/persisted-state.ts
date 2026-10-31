@@ -25,7 +25,7 @@ export const participantDraftSchema = z.discriminatedUnion('type', [
 
 const attemptSchema = z.object({
   participantId: z.string().min(1),
-  result: z.enum(['correct', 'incorrect']),
+  result: z.enum(['correct', 'accepted', 'incorrect']),
   scoreDelta: z.number().int(),
 })
 
@@ -50,6 +50,22 @@ const activeQuestionSchema = legacyActiveQuestionV3Schema.extend({
       maximum: z.number().int().positive(),
     })
     .nullable(),
+  attempts: z.array(attemptSchema),
+  acceptedAnswerScores: z.array(z.number().int().nonnegative()).default([]),
+  pendingOutcome: z
+    .object({
+      result: z.enum(['correct', 'accepted', 'incorrect']),
+      scoreDelta: z.number().int(),
+    })
+    .nullable()
+    .default(null),
+})
+
+const questionTimerSchema = z.object({
+  durationSeconds: z.number().int().min(5).max(300),
+  status: z.enum(['idle', 'running', 'paused', 'expired']),
+  remainingMs: z.number().int().nonnegative(),
+  endsAt: z.number().int().positive().nullable(),
 })
 
 const finalStateSchema = z.object({
@@ -103,6 +119,13 @@ export const persistedGameStateSchema = z.object({
   selectorParticipantId: z.string().min(1).nullable(),
   finalState: finalStateSchema.nullable(),
   history: z.array(runtimeSnapshotSchema).max(50),
+  areScoresVisible: z.boolean().default(false),
+  questionTimer: questionTimerSchema.default({
+    durationSeconds: 30,
+    status: 'idle',
+    remainingMs: 30_000,
+    endsAt: null,
+  }),
 })
 
 const legacyStateV1Schema = z.object({
@@ -184,6 +207,7 @@ export type GameMode = z.infer<typeof persistedGameStateSchema.shape.mode>
 export type ParticipantDraft = z.infer<typeof participantDraftSchema>
 export type PersistedGameState = z.infer<typeof persistedGameStateSchema>
 export type RuntimeSnapshot = z.infer<typeof runtimeSnapshotSchema>
+export type QuestionTimerState = z.infer<typeof questionTimerSchema>
 
 const QUESTION_PHASES = new Set<RuntimeSnapshot['phase']>([
   'catSetup',
@@ -343,7 +367,14 @@ function upgradeV2ActiveQuestion(
   if (!question) return null
 
   // До версии 3 все активные вопросы были обычными, поэтому миграция не меняет их ход.
-  return { ...question, type: 'regular', catPriceOptions: null, auctionBidRange: null }
+  return {
+    ...question,
+    type: 'regular',
+    catPriceOptions: null,
+    auctionBidRange: null,
+    acceptedAnswerScores: [],
+    pendingOutcome: null,
+  }
 }
 
 function upgradeV3ActiveQuestion(
@@ -351,7 +382,12 @@ function upgradeV3ActiveQuestion(
 ): z.infer<typeof activeQuestionSchema> | null {
   if (!question) return null
 
-  return { ...question, auctionBidRange: null }
+  return {
+    ...question,
+    auctionBidRange: null,
+    acceptedAnswerScores: [],
+    pendingOutcome: null,
+  }
 }
 
 export function restorePersistedGameState(

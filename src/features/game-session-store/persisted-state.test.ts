@@ -22,6 +22,13 @@ const fallbackState: PersistedGameState = {
   selectorParticipantId: null,
   finalState: null,
   history: [],
+  areScoresVisible: false,
+  questionTimer: {
+    durationSeconds: 30,
+    status: 'idle',
+    remainingMs: 30_000,
+    endsAt: null,
+  },
 }
 
 const regularQuestion = {
@@ -33,6 +40,8 @@ const regularQuestion = {
   eligibleParticipantIds: ['player-1', 'player-2'],
   activeParticipantId: null,
   attempts: [],
+  acceptedAnswerScores: [],
+  pendingOutcome: null,
 }
 
 const catQuestion = {

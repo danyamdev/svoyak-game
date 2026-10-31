@@ -1,0 +1,120 @@
+.atmosphere {
+  position: fixed;
+  z-index: 20;
+  overflow: hidden;
+  pointer-events: none;
+  inset: 0;
+}
+
+.webLeft,
+.webRight {
+  position: absolute;
+  top: -2.5rem;
+  width: 9rem;
+  height: 9rem;
+  opacity: 0.2;
+  background:
+    repeating-radial-gradient(circle at top left, transparent 0 1.1rem, #fff 1.15rem 1.2rem),
+    repeating-conic-gradient(from 0deg at top left, #fff 0deg 1deg, transparent 1deg 30deg);
+}
+
+.webLeft {
+  left: -2.5rem;
+}
+
+.webRight {
+  right: -2.5rem;
+  transform: scaleX(-1);
+}
+
+.spiderLeft,
+.spiderRight {
+  position: absolute;
+  top: -3rem;
+  font-size: 1.5rem;
+  filter: drop-shadow(0 0 0.4rem rgb(185 242 39 / 45%));
+  animation: spider-drop 11s ease-in-out infinite;
+
+  &::before {
+    position: absolute;
+    bottom: 1.15rem;
+    left: 50%;
+    width: 1px;
+    height: 7rem;
+    content: '';
+    background: rgb(255 255 255 / 35%);
+  }
+}
+
+.spiderLeft {
+  left: 12%;
+}
+
+.spiderRight {
+  right: 10%;
+  animation-delay: -5s;
+}
+
+.fog {
+  position: absolute;
+  right: -20%;
+  bottom: -5rem;
+  width: 75%;
+  height: 12rem;
+  opacity: 0.12;
+  background: radial-gradient(ellipse, var(--color-cyan), transparent 68%);
+  filter: blur(2rem);
+  animation: fog-drift 16s ease-in-out infinite alternate;
+}
+
+.pumpkin {
+  position: absolute;
+  right: 1.2rem;
+  bottom: 1rem;
+  z-index: -1;
+  font-size: clamp(2rem, 6vw, 4rem);
+  opacity: 0.18;
+  filter: drop-shadow(0 0 0.8rem var(--color-orange));
+  animation: pumpkin-glow 3.8s ease-in-out infinite;
+}
+
+@keyframes spider-drop {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+
+  45%,
+  60% {
+    transform: translateY(8rem) rotate(4deg);
+  }
+}
+
+@keyframes fog-drift {
+  to {
+    transform: translateX(-35%);
+  }
+}
+
+@keyframes pumpkin-glow {
+  50% {
+    opacity: 0.34;
+    filter: drop-shadow(0 0 1.4rem var(--color-orange-light));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spiderLeft,
+  .spiderRight,
+  .fog,
+  .pumpkin {
+    animation: none;
+  }
+}
+
+@media (width <= 36rem) {
+  .spiderRight,
+  .webRight {
+    display: none;
+  }
+}

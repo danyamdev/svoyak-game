@@ -25,7 +25,12 @@ export interface RuntimeBidRange {
 
 export interface AnswerAttempt {
   participantId: string
-  result: 'correct' | 'incorrect'
+  result: 'correct' | 'accepted' | 'incorrect'
+  scoreDelta: number
+}
+
+export interface PendingAnswerOutcome {
+  result: AnswerAttempt['result']
   scoreDelta: number
 }
 
@@ -38,6 +43,8 @@ export interface ActiveQuestionState {
   eligibleParticipantIds: string[]
   activeParticipantId: string | null
   attempts: AnswerAttempt[]
+  acceptedAnswerScores: number[]
+  pendingOutcome: PendingAnswerOutcome | null
 }
 
 export interface FinalState {
@@ -69,6 +76,7 @@ export type GameCommand =
       questionType: RuntimeQuestionType
       price: number
       catPriceOptions: [number, number] | null
+      acceptedAnswerScores: number[]
       participantIds: string[]
     }
   | { type: 'catRecipientChosen'; participantId: string }
@@ -76,8 +84,9 @@ export type GameCommand =
   | { type: 'auctionWinnerChosen'; participantId: string }
   | { type: 'auctionBidChosen'; bid: number }
   | { type: 'answererChosen'; participantId: string }
-  | { type: 'answerMarkedCorrect' }
-  | { type: 'answerMarkedIncorrect' }
+  | { type: 'answerRevealed' }
+  | { type: 'answerOutcomeSelected'; result: AnswerAttempt['result']; scoreDelta: number }
+  | { type: 'answerOutcomeConfirmed' }
   | { type: 'questionSkipped' }
   | { type: 'answerClosed'; roundQuestionIds: string[] }
   | { type: 'nextRoundStarted'; totalRounds: number }
@@ -105,6 +114,7 @@ export function transitionGame(state: GameRuntimeState, command: GameCommand): G
         command.questionType,
         command.price,
         command.catPriceOptions,
+        command.acceptedAnswerScores,
         command.participantIds,
       )
     case 'catRecipientChosen':
@@ -117,10 +127,12 @@ export function transitionGame(state: GameRuntimeState, command: GameCommand): G
       return chooseAuctionBid(state, command.bid)
     case 'answererChosen':
       return chooseAnswerer(state, command.participantId)
-    case 'answerMarkedCorrect':
-      return markCorrect(state)
-    case 'answerMarkedIncorrect':
-      return markIncorrect(state)
+    case 'answerRevealed':
+      return revealAnswer(state)
+    case 'answerOutcomeSelected':
+      return selectAnswerOutcome(state, command.result, command.scoreDelta)
+    case 'answerOutcomeConfirmed':
+      return confirmAnswerOutcome(state)
     case 'questionSkipped':
       return skipQuestion(state)
     case 'answerClosed':
@@ -164,6 +176,7 @@ function selectQuestion(
   questionType: RuntimeQuestionType,
   price: number,
   catPriceOptions: [number, number] | null,
+  acceptedAnswerScores: number[],
   participantIds: string[],
 ) {
   if (state.phase !== 'board' || state.usedQuestionIds.includes(questionId)) return state
@@ -186,6 +199,8 @@ function selectQuestion(
       eligibleParticipantIds: participantIds,
       activeParticipantId: null,
       attempts: [],
+      acceptedAnswerScores,
+      pendingOutcome: null,
     },
   }
 }
@@ -250,6 +265,7 @@ function chooseCatPrice(state: GameRuntimeState, price: number) {
     activeQuestion: {
       ...question,
       price,
+      acceptedAnswerScores: question.acceptedAnswerScores.map((points) => Math.min(points, price)),
       eligibleParticipantIds: [participantId],
     },
   }
@@ -267,54 +283,83 @@ function chooseAnswerer(state: GameRuntimeState, participantId: string) {
   }
 }
 
-function markCorrect(state: GameRuntimeState) {
+function revealAnswer(state: GameRuntimeState) {
   const question = state.activeQuestion
   const participantId = question?.activeParticipantId
   if (state.phase !== 'judging' || !question || !participantId) return state
 
+  return { ...state, phase: 'answerReveal' as const }
+}
+
+function selectAnswerOutcome(
+  state: GameRuntimeState,
+  result: AnswerAttempt['result'],
+  scoreDelta: number,
+) {
+  const question = state.activeQuestion
+  if (state.phase !== 'answerReveal' || !question?.activeParticipantId) return state
+  if (!Number.isInteger(scoreDelta)) return state
+
+  if (!isAnswerOutcomeValid(question, { result, scoreDelta })) return state
+  return { ...state, activeQuestion: { ...question, pendingOutcome: { result, scoreDelta } } }
+}
+
+function isAnswerOutcomeValid(question: ActiveQuestionState, outcome: PendingAnswerOutcome) {
+  return (
+    (outcome.result === 'correct' && outcome.scoreDelta === question.price) ||
+    (outcome.result === 'accepted' &&
+      outcome.scoreDelta >= 0 &&
+      outcome.scoreDelta <= question.price &&
+      question.acceptedAnswerScores.includes(outcome.scoreDelta)) ||
+    (outcome.result === 'incorrect' && outcome.scoreDelta === -question.price)
+  )
+}
+
+function confirmAnswerOutcome(state: GameRuntimeState) {
+  const question = state.activeQuestion
+  const participantId = question?.activeParticipantId
+  const outcome = question?.pendingOutcome
+  if (state.phase !== 'answerReveal' || !question || !participantId || !outcome) return state
+  if (!isAnswerOutcomeValid(question, outcome)) return state
+
+  const attempts = [
+    ...question.attempts,
+    { participantId, result: outcome.result, scoreDelta: outcome.scoreDelta },
+  ]
+
+  if (outcome.result === 'incorrect') {
+    const eligibleParticipantIds = question.eligibleParticipantIds.filter(
+      (id) => id !== participantId,
+    )
+
+    return {
+      ...state,
+      phase: eligibleParticipantIds.length > 0 ? ('question' as const) : ('answerReveal' as const),
+      scores: {
+        ...state.scores,
+        [participantId]: (state.scores[participantId] ?? 0) + outcome.scoreDelta,
+      },
+      activeQuestion: {
+        ...question,
+        eligibleParticipantIds,
+        activeParticipantId: null,
+        attempts,
+        pendingOutcome: null,
+      },
+    }
+  }
+
   return {
     ...state,
-    phase: 'answerReveal' as const,
     scores: {
       ...state.scores,
-      [participantId]: (state.scores[participantId] ?? 0) + question.price,
+      [participantId]: (state.scores[participantId] ?? 0) + outcome.scoreDelta,
     },
     selectorParticipantId: participantId,
     activeQuestion: {
       ...question,
-      attempts: [
-        ...question.attempts,
-        { participantId, result: 'correct' as const, scoreDelta: question.price },
-      ],
-    },
-  }
-}
-
-function markIncorrect(state: GameRuntimeState) {
-  const question = state.activeQuestion
-  const participantId = question?.activeParticipantId
-  if (state.phase !== 'judging' || !question || !participantId) return state
-
-  const eligibleParticipantIds = question.eligibleParticipantIds.filter(
-    (id) => id !== participantId,
-  )
-
-  return {
-    ...state,
-    // Если отвечать больше некому, движок сразу переводит игру к показу ответа.
-    phase: eligibleParticipantIds.length > 0 ? ('question' as const) : ('answerReveal' as const),
-    scores: {
-      ...state.scores,
-      [participantId]: (state.scores[participantId] ?? 0) - question.price,
-    },
-    activeQuestion: {
-      ...question,
-      eligibleParticipantIds,
-      activeParticipantId: null,
-      attempts: [
-        ...question.attempts,
-        { participantId, result: 'incorrect' as const, scoreDelta: -question.price },
-      ],
+      attempts,
+      pendingOutcome: null,
     },
   }
 }
