@@ -147,7 +147,7 @@ export function transitionGame(state: GameRuntimeState, command: GameCommand): G
 }
 
 function adjustScore(state: GameRuntimeState, participantId: string, delta: number) {
-  if (!Number.isInteger(delta) || !(participantId in state.scores)) return state
+  if (!Number.isInteger(delta) || delta === 0 || !(participantId in state.scores)) return state
 
   return {
     ...state,

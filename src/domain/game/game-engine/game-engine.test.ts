@@ -13,6 +13,26 @@ const initialState: GameRuntimeState = {
 }
 
 describe('transitionGame', () => {
+  it('applies an arbitrary integer score correction', () => {
+    const result = transitionGame(initialState, {
+      type: 'scoreAdjusted',
+      participantId: 'player1',
+      delta: -250,
+    })
+
+    expect(result.scores.player1).toBe(-250)
+  })
+
+  it('ignores an empty score correction', () => {
+    expect(
+      transitionGame(initialState, {
+        type: 'scoreAdjusted',
+        participantId: 'player1',
+        delta: 0,
+      }),
+    ).toBe(initialState)
+  })
+
   it('opens a question and assigns an eligible answerer', () => {
     const questionState = transitionGame(initialState, {
       type: 'questionSelected',

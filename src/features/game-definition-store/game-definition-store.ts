@@ -23,11 +23,13 @@ interface GameDefinitionActions {
   updateQuestionType: (questionId: string, type: Question['type']) => void
   updateFinalTheme: (themeId: string, field: FinalThemeField, value: string) => void
   updateTieBreaker: (field: 'prompt' | 'answer', value: string) => void
+  replaceDefinition: (definition: GameDefinition) => boolean
   resetDefinition: () => void
 }
 
 interface GameDefinitionStore extends GameDefinitionActions {
   definition: GameDefinition
+  definitionRevision: number
 }
 
 function cloneDefaultDefinition() {
@@ -87,6 +89,7 @@ export const useGameDefinitionStore = create<GameDefinitionStore>()(
   persist(
     (set) => ({
       definition: cloneDefaultDefinition(),
+      definitionRevision: 0,
       renameGame: (title) => {
         if (!title.trim()) return
         set(({ definition }) => ({ definition: { ...definition, title } }))
@@ -187,7 +190,21 @@ export const useGameDefinitionStore = create<GameDefinitionStore>()(
           },
         }))
       },
-      resetDefinition: () => set({ definition: cloneDefaultDefinition() }),
+      replaceDefinition: (definition) => {
+        const result = gameDefinitionSchema.safeParse(definition)
+        if (!result.success) return false
+
+        set(({ definitionRevision }) => ({
+          definition: result.data,
+          definitionRevision: definitionRevision + 1,
+        }))
+        return true
+      },
+      resetDefinition: () =>
+        set(({ definitionRevision }) => ({
+          definition: cloneDefaultDefinition(),
+          definitionRevision: definitionRevision + 1,
+        })),
     }),
     {
       name: STORAGE_KEY,

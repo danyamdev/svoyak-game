@@ -1,10 +1,11 @@
-import type { FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Dialog } from 'radix-ui'
 
 import { getContentText } from '../../domain/game'
 import { useGameDefinitionStore } from '../../features/game-definition-store'
 import { useGameSessionStore } from '../../features/game-session-store'
+import { ConfirmationDialog } from '../../shared/ui/confirmation-dialog'
 import styles from './final-panel.module.scss'
 
 const FINAL_PHASES = new Set([
@@ -243,6 +244,7 @@ interface ResultsProps {
 }
 
 function Results({ participants, scores, winnerParticipantIds, restartSession }: ResultsProps) {
+  const [isRestartConfirmationOpen, setRestartConfirmationOpen] = useState(false)
   const leaderboard = [...participants].sort(
     (first, second) => (scores[second.id] ?? 0) - (scores[first.id] ?? 0),
   )
@@ -263,10 +265,21 @@ function Results({ participants, scores, winnerParticipantIds, restartSession }:
       </ol>
       <div>
         <Link to="/">На главную</Link>
-        <button type="button" onClick={restartSession}>
+        <button type="button" onClick={() => setRestartConfirmationOpen(true)}>
           Сыграть ещё раз
         </button>
       </div>
+      <ConfirmationDialog
+        open={isRestartConfirmationOpen}
+        title="Начать новую игру?"
+        description="Итоговый счёт и прогресс завершённой партии будут очищены. Состав участников сохранится."
+        confirmLabel="Начать заново"
+        onConfirm={() => {
+          restartSession()
+          setRestartConfirmationOpen(false)
+        }}
+        onOpenChange={setRestartConfirmationOpen}
+      />
     </section>
   )
 }

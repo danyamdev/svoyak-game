@@ -2,11 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useGameSessionStore, type GameMode } from '../../features/game-session-store'
+import { ConfirmationDialog } from '../../shared/ui/confirmation-dialog'
 import styles from './setup-page.module.scss'
 
 export function SetupPage() {
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
+  const [isResetConfirmationOpen, setResetConfirmationOpen] = useState(false)
   const {
     mode,
     participants,
@@ -48,10 +50,7 @@ export function SetupPage() {
         <button
           className={styles.resetButton}
           type="button"
-          onClick={() => {
-            resetSession()
-            setError(null)
-          }}
+          onClick={() => setResetConfirmationOpen(true)}
         >
           Сбросить настройки
         </button>
@@ -179,6 +178,18 @@ export function SetupPage() {
           </footer>
         </form>
       </section>
+      <ConfirmationDialog
+        open={isResetConfirmationOpen}
+        title="Сбросить игру и участников?"
+        description="Будут удалены текущий счёт, прогресс раундов и настройки участников. Отменить это действие будет нельзя."
+        confirmLabel="Сбросить игру"
+        onConfirm={() => {
+          resetSession()
+          setError(null)
+          setResetConfirmationOpen(false)
+        }}
+        onOpenChange={setResetConfirmationOpen}
+      />
     </main>
   )
 }

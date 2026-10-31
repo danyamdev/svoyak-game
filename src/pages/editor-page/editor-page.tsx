@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 
 import { getContentText, type Question } from '../../domain/game'
 import { useGameDefinitionStore } from '../../features/game-definition-store'
+import { PackageTransfer } from '../../widgets/package-transfer'
 import styles from './editor-page.module.scss'
 
 const QUESTION_TYPE_LABELS: Record<Question['type'], string> = {
@@ -15,6 +16,7 @@ export function EditorPage() {
   const [roundIndex, setRoundIndex] = useState(0)
   const {
     definition,
+    definitionRevision,
     renameGame,
     renameRound,
     renameCategory,
@@ -51,12 +53,15 @@ export function EditorPage() {
         <label>
           Название игры
           <input
+            key={`game-title-${definitionRevision}`}
             defaultValue={definition.title}
             required
             onBlur={(event) => renameGame(event.currentTarget.value)}
           />
         </label>
       </section>
+
+      <PackageTransfer />
 
       <nav className={styles.roundTabs} aria-label="Раунды">
         {definition.rounds.map((item, index) => (
@@ -75,7 +80,7 @@ export function EditorPage() {
         <label className={styles.roundTitle}>
           Название раунда
           <input
-            key={round.id}
+            key={`${round.id}-${definitionRevision}`}
             defaultValue={round.title}
             required
             onBlur={(event) => renameRound(round.id, event.currentTarget.value)}
@@ -83,7 +88,7 @@ export function EditorPage() {
         </label>
 
         {round.categories.map((category, categoryIndex) => (
-          <article className={styles.categoryCard} key={category.id}>
+          <article className={styles.categoryCard} key={`${category.id}-${definitionRevision}`}>
             <label className={styles.categoryTitle}>
               Категория {categoryIndex + 1}
               <input
@@ -165,7 +170,7 @@ export function EditorPage() {
         </div>
         <div className={styles.finalThemes}>
           {definition.finalThemes.map((theme, index) => (
-            <article key={theme.id}>
+            <article key={`${theme.id}-${definitionRevision}`}>
               <strong>Тема {index + 1}</strong>
               <label>
                 Название
@@ -199,7 +204,7 @@ export function EditorPage() {
         </div>
 
         {definition.tieBreakers[0] && (
-          <article className={styles.tieBreakerEditor}>
+          <article className={styles.tieBreakerEditor} key={`tie-breaker-${definitionRevision}`}>
             <h2>Дополнительный вопрос</h2>
             <label>
               Вопрос

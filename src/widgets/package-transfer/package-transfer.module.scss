@@ -1,0 +1,87 @@
+.transfer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  width: min(100%, 80rem);
+  padding: 1rem;
+  margin: 0 auto 1.5rem;
+  background: rgb(31 11 67 / 88%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 1rem;
+
+  h2,
+  p {
+    margin: 0;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    color: var(--color-lime);
+    text-transform: uppercase;
+  }
+
+  p {
+    margin-top: 0.25rem;
+    font-size: 0.78rem;
+    color: rgb(255 243 214 / 65%);
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 0.55rem;
+
+  button {
+    padding: 0.65rem 0.85rem;
+    font-weight: 850;
+    color: var(--color-cream);
+    background: rgb(255 255 255 / 8%);
+    border: 1px solid rgb(255 255 255 / 15%);
+    border-radius: 0.65rem;
+
+    &:hover {
+      background: rgb(255 255 255 / 14%);
+    }
+
+    &:focus-visible {
+      outline: 0.16rem solid var(--color-cyan);
+      outline-offset: 0.14rem;
+    }
+  }
+
+  input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.transfer .error,
+.transfer .success {
+  grid-column: 1 / -1;
+  margin-top: 0;
+  font-weight: 750;
+}
+
+.transfer .error {
+  color: #ffb7c8;
+}
+
+.transfer .success {
+  color: var(--color-lime);
+}
+
+@media (width <= 42rem) {
+  .transfer {
+    grid-template-columns: 1fr;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

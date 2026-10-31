@@ -1,13 +1,18 @@
-import { Link, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 
 import { useGameDefinitionStore } from '../../features/game-definition-store'
 import { useGameSessionStore } from '../../features/game-session-store'
+import { ConfirmationDialog } from '../../shared/ui/confirmation-dialog'
 import { FinalPanel } from '../../widgets/final-panel'
 import { QuestionPanel } from '../../widgets/question-panel'
 import { RoundCompletePanel } from '../../widgets/round-complete-panel'
+import { ScoreControls } from '../../widgets/score-controls'
 import styles from './game-page.module.scss'
 
 export function GamePage() {
+  const navigate = useNavigate()
+  const [pendingPath, setPendingPath] = useState<string | null>(null)
   const definition = useGameDefinitionStore(({ definition }) => definition)
   const {
     status,
@@ -16,9 +21,23 @@ export function GamePage() {
     roundIndex,
     phase,
     usedQuestionIds,
-    changeScore,
+    history,
     selectQuestion,
+    undo,
   } = useGameSessionStore()
+
+  useEffect(() => {
+    if (status !== 'active' || phase === 'results') return
+
+    // Браузеры показывают собственный текст предупреждения; приложение может только запросить его.
+    function preventAccidentalClose(event: BeforeUnloadEvent) {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+
+    window.addEventListener('beforeunload', preventAccidentalClose)
+    return () => window.removeEventListener('beforeunload', preventAccidentalClose)
+  }, [phase, status])
 
   if (status !== 'active') {
     return <Navigate to="/setup" replace />
@@ -26,19 +45,38 @@ export function GamePage() {
 
   const round = definition.rounds[roundIndex]
 
+  function requestNavigation(path: string) {
+    if (phase === 'results') {
+      void navigate(path)
+      return
+    }
+
+    setPendingPath(path)
+  }
+
+  function confirmNavigation() {
+    if (!pendingPath) return
+    void navigate(pendingPath)
+    setPendingPath(null)
+  }
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link className={styles.homeLink} to="/">
+        <button className={styles.homeLink} type="button" onClick={() => requestNavigation('/')}>
           🎃 Своя игра
-        </Link>
+        </button>
         <div className={styles.persistenceStatus}>
           <span aria-hidden="true" />
           Сохраняется автоматически
         </div>
-        <Link className={styles.settingsLink} to="/setup">
+        <button
+          className={styles.settingsLink}
+          type="button"
+          onClick={() => requestNavigation('/setup')}
+        >
           Настройка участников
-        </Link>
+        </button>
       </header>
 
       <section className={styles.scoreboard} aria-label="Счёт участников">
@@ -51,14 +89,7 @@ export function GamePage() {
               <span>{participant.name}</span>
               <strong aria-live="polite">{scores[participant.id] ?? 0}</strong>
             </div>
-            <div className={styles.scoreActions} aria-label={`Изменить счёт: ${participant.name}`}>
-              <button type="button" onClick={() => changeScore(participant.id, -100)}>
-                −100
-              </button>
-              <button type="button" onClick={() => changeScore(participant.id, 100)}>
-                +100
-              </button>
-            </div>
+            <ScoreControls participantId={participant.id} participantName={participant.name} />
           </article>
         ))}
       </section>
@@ -69,6 +100,9 @@ export function GamePage() {
             <span>Основная игра</span>
             <h1>{round.title}</h1>
           </div>
+          <button type="button" disabled={history.length === 0} onClick={undo}>
+            ↶ Отменить последнее действие
+          </button>
         </div>
 
         <div className={styles.board} aria-label={`Игровое поле, раунд ${roundIndex + 1}`}>
@@ -102,6 +136,16 @@ export function GamePage() {
       <QuestionPanel />
       <RoundCompletePanel />
       <FinalPanel />
+      <ConfirmationDialog
+        open={pendingPath !== null}
+        title="Покинуть игровое поле?"
+        description="Текущая партия сохранена. Вы сможете вернуться к ней с главной страницы, но незавершённый вопрос останется открытым."
+        confirmLabel="Покинуть поле"
+        onConfirm={confirmNavigation}
+        onOpenChange={(open) => {
+          if (!open) setPendingPath(null)
+        }}
+      />
     </main>
   )
 }
