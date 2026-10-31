@@ -5,6 +5,7 @@ import {
   DEFAULT_GAME_DEFINITION,
   gameDefinitionSchema,
   getContentText,
+  normalizeAcceptedAnswers,
   type GameDefinition,
   type Question,
 } from '../../domain/game'
@@ -21,8 +22,11 @@ interface GameDefinitionActions {
   updateQuestionText: (questionId: string, field: QuestionTextField, text: string) => void
   updateQuestionPrice: (questionId: string, price: number) => void
   updateQuestionType: (questionId: string, type: Question['type']) => void
+  updateQuestionAcceptedAnswers: (questionId: string, alternatives: string[]) => void
   updateFinalTheme: (themeId: string, field: FinalThemeField, value: string) => void
+  updateFinalThemeAcceptedAnswers: (themeId: string, alternatives: string[]) => void
   updateTieBreaker: (field: 'prompt' | 'answer', value: string) => void
+  updateTieBreakerAcceptedAnswers: (alternatives: string[]) => void
   replaceDefinition: (definition: GameDefinition) => boolean
   resetDefinition: () => void
 }
@@ -122,11 +126,20 @@ export const useGameDefinitionStore = create<GameDefinitionStore>()(
       updateQuestionText: (questionId, field, text) => {
         if (!text.trim()) return
         set(({ definition }) => ({
-          definition: updateQuestion(definition, questionId, (question) => ({
-            ...question,
-            [field]: [{ type: 'text', text }],
-            ...(field === 'answer' ? { acceptedAnswers: text ? [text] : [] } : {}),
-          })),
+          definition: updateQuestion(definition, questionId, (question) => {
+            const previousAnswer = getContentText(question.answer)
+            const alternatives = question.acceptedAnswers.filter(
+              (answer) => answer !== previousAnswer,
+            )
+
+            return {
+              ...question,
+              [field]: [{ type: 'text', text }],
+              ...(field === 'answer'
+                ? { acceptedAnswers: normalizeAcceptedAnswers(text, alternatives) }
+                : {}),
+            }
+          }),
         }))
       },
       updateQuestionPrice: (questionId, price) => {
@@ -155,6 +168,16 @@ export const useGameDefinitionStore = create<GameDefinitionStore>()(
               : { ...baseQuestion, type: 'regular' }
           }),
         })),
+      updateQuestionAcceptedAnswers: (questionId, alternatives) =>
+        set(({ definition }) => ({
+          definition: updateQuestion(definition, questionId, (question) => ({
+            ...question,
+            acceptedAnswers: normalizeAcceptedAnswers(
+              getContentText(question.answer),
+              alternatives,
+            ),
+          })),
+        })),
       updateFinalTheme: (themeId, field, value) => {
         if (!value.trim()) return
         set(({ definition }) => ({
@@ -167,12 +190,38 @@ export const useGameDefinitionStore = create<GameDefinitionStore>()(
               return {
                 ...theme,
                 [field]: [{ type: 'text', text: value }],
-                ...(field === 'answer' ? { acceptedAnswers: value ? [value] : [] } : {}),
+                ...(field === 'answer'
+                  ? {
+                      acceptedAnswers: normalizeAcceptedAnswers(
+                        value,
+                        theme.acceptedAnswers.filter(
+                          (answer) => answer !== getContentText(theme.answer),
+                        ),
+                      ),
+                    }
+                  : {}),
               }
             }),
           },
         }))
       },
+      updateFinalThemeAcceptedAnswers: (themeId, alternatives) =>
+        set(({ definition }) => ({
+          definition: {
+            ...definition,
+            finalThemes: definition.finalThemes.map((theme) =>
+              theme.id === themeId
+                ? {
+                    ...theme,
+                    acceptedAnswers: normalizeAcceptedAnswers(
+                      getContentText(theme.answer),
+                      alternatives,
+                    ),
+                  }
+                : theme,
+            ),
+          },
+        })),
       updateTieBreaker: (field, value) => {
         if (!value.trim()) return
         set(({ definition }) => ({
@@ -183,13 +232,39 @@ export const useGameDefinitionStore = create<GameDefinitionStore>()(
                 ? {
                     ...question,
                     [field]: [{ type: 'text', text: value }],
-                    ...(field === 'answer' ? { acceptedAnswers: value ? [value] : [] } : {}),
+                    ...(field === 'answer'
+                      ? {
+                          acceptedAnswers: normalizeAcceptedAnswers(
+                            value,
+                            question.acceptedAnswers.filter(
+                              (answer) => answer !== getContentText(question.answer),
+                            ),
+                          ),
+                        }
+                      : {}),
                   }
                 : question,
             ),
           },
         }))
       },
+      updateTieBreakerAcceptedAnswers: (alternatives) =>
+        set(({ definition }) => ({
+          definition: {
+            ...definition,
+            tieBreakers: definition.tieBreakers.map((question, index) =>
+              index === 0
+                ? {
+                    ...question,
+                    acceptedAnswers: normalizeAcceptedAnswers(
+                      getContentText(question.answer),
+                      alternatives,
+                    ),
+                  }
+                : question,
+            ),
+          },
+        })),
       replaceDefinition: (definition) => {
         const result = gameDefinitionSchema.safeParse(definition)
         if (!result.success) return false

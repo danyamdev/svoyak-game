@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 
 import { getContentText, type Question } from '../../domain/game'
 import { useGameDefinitionStore } from '../../features/game-definition-store'
+import { ConfirmationDialog } from '../../shared/ui/confirmation-dialog'
+import { RequiredTextField } from '../../shared/ui/required-text-field'
 import { PackageTransfer } from '../../widgets/package-transfer'
 import styles from './editor-page.module.scss'
 
@@ -12,8 +14,17 @@ const QUESTION_TYPE_LABELS: Record<Question['type'], string> = {
   auction: 'Аукцион',
 }
 
+function getAlternativeAnswers(primaryAnswer: string, acceptedAnswers: string[]) {
+  return acceptedAnswers.filter((answer) => answer !== primaryAnswer).join('\n')
+}
+
+function splitAlternativeAnswers(value: string) {
+  return value.split('\n')
+}
+
 export function EditorPage() {
   const [roundIndex, setRoundIndex] = useState(0)
+  const [isResetConfirmationOpen, setResetConfirmationOpen] = useState(false)
   const {
     definition,
     definitionRevision,
@@ -23,8 +34,11 @@ export function EditorPage() {
     updateQuestionText,
     updateQuestionPrice,
     updateQuestionType,
+    updateQuestionAcceptedAnswers,
     updateFinalTheme,
+    updateFinalThemeAcceptedAnswers,
     updateTieBreaker,
+    updateTieBreakerAcceptedAnswers,
     resetDefinition,
   } = useGameDefinitionStore()
   const round = definition.rounds[roundIndex]
@@ -37,12 +51,7 @@ export function EditorPage() {
           <span aria-hidden="true" />
           Сохраняется автоматически
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm('Вернуть исходный хэллоуинский пакет?')) resetDefinition()
-          }}
-        >
+        <button type="button" onClick={() => setResetConfirmationOpen(true)}>
           Сбросить пакет
         </button>
       </header>
@@ -50,15 +59,12 @@ export function EditorPage() {
       <section className={styles.intro}>
         <p>Редактор пакета</p>
         <h1>Вопросы и темы</h1>
-        <label>
-          Название игры
-          <input
-            key={`game-title-${definitionRevision}`}
-            defaultValue={definition.title}
-            required
-            onBlur={(event) => renameGame(event.currentTarget.value)}
-          />
-        </label>
+        <RequiredTextField
+          key={`game-title-${definitionRevision}`}
+          label="Название игры"
+          value={definition.title}
+          onCommit={renameGame}
+        />
       </section>
 
       <PackageTransfer />
@@ -77,26 +83,22 @@ export function EditorPage() {
       </nav>
 
       <section className={styles.roundEditor}>
-        <label className={styles.roundTitle}>
-          Название раунда
-          <input
-            key={`${round.id}-${definitionRevision}`}
-            defaultValue={round.title}
-            required
-            onBlur={(event) => renameRound(round.id, event.currentTarget.value)}
-          />
-        </label>
+        <RequiredTextField
+          key={`${round.id}-${definitionRevision}`}
+          className={styles.roundTitle}
+          label="Название раунда"
+          value={round.title}
+          onCommit={(value) => renameRound(round.id, value)}
+        />
 
         {round.categories.map((category, categoryIndex) => (
           <article className={styles.categoryCard} key={`${category.id}-${definitionRevision}`}>
-            <label className={styles.categoryTitle}>
-              Категория {categoryIndex + 1}
-              <input
-                defaultValue={category.title}
-                required
-                onBlur={(event) => renameCategory(category.id, event.currentTarget.value)}
-              />
-            </label>
+            <RequiredTextField
+              className={styles.categoryTitle}
+              label={`Категория ${categoryIndex + 1}`}
+              value={category.title}
+              onCommit={(value) => renameCategory(category.id, value)}
+            />
 
             <div className={styles.questionList}>
               {category.questions.map((question, questionIndex) => (
@@ -134,25 +136,33 @@ export function EditorPage() {
                       </select>
                     </label>
                   </div>
+                  <RequiredTextField
+                    label="Текст вопроса"
+                    value={getContentText(question.prompt)}
+                    multiline
+                    rows={3}
+                    onCommit={(value) => updateQuestionText(question.id, 'prompt', value)}
+                  />
+                  <RequiredTextField
+                    label="Правильный ответ"
+                    value={getContentText(question.answer)}
+                    multiline
+                    onCommit={(value) => updateQuestionText(question.id, 'answer', value)}
+                  />
                   <label>
-                    Текст вопроса
+                    Допустимые варианты ответа
+                    <span className={styles.fieldHint}>По одному варианту на строку</span>
                     <textarea
-                      defaultValue={getContentText(question.prompt)}
-                      required
-                      rows={3}
-                      onBlur={(event) =>
-                        updateQuestionText(question.id, 'prompt', event.currentTarget.value)
-                      }
-                    />
-                  </label>
-                  <label>
-                    Правильный ответ
-                    <textarea
-                      defaultValue={getContentText(question.answer)}
-                      required
                       rows={2}
+                      defaultValue={getAlternativeAnswers(
+                        getContentText(question.answer),
+                        question.acceptedAnswers,
+                      )}
                       onBlur={(event) =>
-                        updateQuestionText(question.id, 'answer', event.currentTarget.value)
+                        updateQuestionAcceptedAnswers(
+                          question.id,
+                          splitAlternativeAnswers(event.currentTarget.value),
+                        )
                       }
                     />
                   </label>
@@ -172,30 +182,37 @@ export function EditorPage() {
           {definition.finalThemes.map((theme, index) => (
             <article key={`${theme.id}-${definitionRevision}`}>
               <strong>Тема {index + 1}</strong>
+              <RequiredTextField
+                label="Название"
+                value={theme.title}
+                onCommit={(value) => updateFinalTheme(theme.id, 'title', value)}
+              />
+              <RequiredTextField
+                label="Вопрос"
+                value={getContentText(theme.prompt)}
+                multiline
+                onCommit={(value) => updateFinalTheme(theme.id, 'prompt', value)}
+              />
+              <RequiredTextField
+                label="Ответ"
+                value={getContentText(theme.answer)}
+                multiline
+                onCommit={(value) => updateFinalTheme(theme.id, 'answer', value)}
+              />
               <label>
-                Название
-                <input
-                  defaultValue={theme.title}
-                  onBlur={(event) => updateFinalTheme(theme.id, 'title', event.currentTarget.value)}
-                />
-              </label>
-              <label>
-                Вопрос
+                Допустимые варианты ответа
+                <span className={styles.fieldHint}>По одному варианту на строку</span>
                 <textarea
                   rows={2}
-                  defaultValue={getContentText(theme.prompt)}
+                  defaultValue={getAlternativeAnswers(
+                    getContentText(theme.answer),
+                    theme.acceptedAnswers,
+                  )}
                   onBlur={(event) =>
-                    updateFinalTheme(theme.id, 'prompt', event.currentTarget.value)
-                  }
-                />
-              </label>
-              <label>
-                Ответ
-                <textarea
-                  rows={2}
-                  defaultValue={getContentText(theme.answer)}
-                  onBlur={(event) =>
-                    updateFinalTheme(theme.id, 'answer', event.currentTarget.value)
+                    updateFinalThemeAcceptedAnswers(
+                      theme.id,
+                      splitAlternativeAnswers(event.currentTarget.value),
+                    )
                   }
                 />
               </label>
@@ -206,25 +223,49 @@ export function EditorPage() {
         {definition.tieBreakers[0] && (
           <article className={styles.tieBreakerEditor} key={`tie-breaker-${definitionRevision}`}>
             <h2>Дополнительный вопрос</h2>
+            <RequiredTextField
+              label="Вопрос"
+              value={getContentText(definition.tieBreakers[0].prompt)}
+              multiline
+              onCommit={(value) => updateTieBreaker('prompt', value)}
+            />
+            <RequiredTextField
+              label="Ответ"
+              value={getContentText(definition.tieBreakers[0].answer)}
+              multiline
+              onCommit={(value) => updateTieBreaker('answer', value)}
+            />
             <label>
-              Вопрос
+              Допустимые варианты ответа
+              <span className={styles.fieldHint}>По одному варианту на строку</span>
               <textarea
                 rows={2}
-                defaultValue={getContentText(definition.tieBreakers[0].prompt)}
-                onBlur={(event) => updateTieBreaker('prompt', event.currentTarget.value)}
-              />
-            </label>
-            <label>
-              Ответ
-              <textarea
-                rows={2}
-                defaultValue={getContentText(definition.tieBreakers[0].answer)}
-                onBlur={(event) => updateTieBreaker('answer', event.currentTarget.value)}
+                defaultValue={getAlternativeAnswers(
+                  getContentText(definition.tieBreakers[0].answer),
+                  definition.tieBreakers[0].acceptedAnswers,
+                )}
+                onBlur={(event) =>
+                  updateTieBreakerAcceptedAnswers(
+                    splitAlternativeAnswers(event.currentTarget.value),
+                  )
+                }
               />
             </label>
           </article>
         )}
       </section>
+      <ConfirmationDialog
+        open={isResetConfirmationOpen}
+        title="Вернуть исходный пакет?"
+        description="Все изменения тем, вопросов и ответов будут заменены стандартным хэллоуинским пакетом. Отменить это действие будет нельзя."
+        confirmLabel="Сбросить пакет"
+        onConfirm={() => {
+          resetDefinition()
+          setRoundIndex(0)
+          setResetConfirmationOpen(false)
+        }}
+        onOpenChange={setResetConfirmationOpen}
+      />
     </main>
   )
 }

@@ -1,3 +1,4 @@
+export * from './accepted-answers'
 export * from './content'
 export * from './default-game'
 export * from './game-engine'
