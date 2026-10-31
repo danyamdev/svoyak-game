@@ -24,6 +24,62 @@ const fallbackState: PersistedGameState = {
   history: [],
 }
 
+const regularQuestion = {
+  questionId: 'question-1',
+  type: 'regular' as const,
+  price: 300,
+  catPriceOptions: null,
+  auctionBidRange: null,
+  eligibleParticipantIds: ['player-1', 'player-2'],
+  activeParticipantId: null,
+  attempts: [],
+}
+
+const catQuestion = {
+  ...regularQuestion,
+  questionId: 'cat-1',
+  type: 'cat' as const,
+  catPriceOptions: [100, 500] as [number, number],
+}
+
+const auctionQuestion = {
+  ...regularQuestion,
+  questionId: 'auction-1',
+  type: 'auction' as const,
+}
+
+const finalState = {
+  themeIds: ['theme-1'],
+  eliminatedThemeIds: [],
+  selectedThemeId: null,
+  eligibleParticipantIds: ['player-1', 'player-2'],
+  wagers: {},
+  judgedParticipantIds: [],
+  tieParticipantIds: [],
+  winnerParticipantIds: [],
+}
+
+const runtimePhaseCases: [
+  PersistedGameState['phase'],
+  PersistedGameState['activeQuestion'],
+  PersistedGameState['finalState'],
+][] = [
+  ['board', null, null],
+  ['catSetup', catQuestion, null],
+  ['auctionSetup', auctionQuestion, null],
+  ['question', regularQuestion, null],
+  ['judging', regularQuestion, null],
+  ['answerReveal', regularQuestion, null],
+  ['roundComplete', null, null],
+  ['finalThemeSelection', null, finalState],
+  ['finalWager', null, finalState],
+  ['finalQuestion', null, finalState],
+  ['finalJudging', null, finalState],
+  ['tieBreakerQuestion', null, finalState],
+  ['tieBreakerJudging', null, finalState],
+  ['results', null, finalState],
+]
+
 describe('restorePersistedGameState', () => {
   it('restores a valid active session with scores and the current round', () => {
     const persistedState: PersistedGameState = {
@@ -37,10 +93,55 @@ describe('restorePersistedGameState', () => {
     expect(restorePersistedGameState(persistedState, fallbackState)).toEqual(persistedState)
   })
 
+  it.each(runtimePhaseCases)(
+    'restores a coherent %s phase',
+    (phase, activeQuestion, finalState) => {
+      const persistedState: PersistedGameState = {
+        ...fallbackState,
+        scores: { 'player-1': 700, 'player-2': -200 },
+        status: 'active',
+        phase,
+        activeQuestion,
+        selectorParticipantId: 'player-1',
+        finalState,
+      }
+
+      expect(restorePersistedGameState(persistedState, fallbackState)).toEqual(persistedState)
+    },
+  )
+
   it('uses a safe fallback when localStorage contains invalid data', () => {
     expect(
       restorePersistedGameState({ schemaVersion: 99, scores: 'broken' }, fallbackState),
     ).toEqual(fallbackState)
+  })
+
+  it('rejects a question phase without an active question', () => {
+    const inconsistentState = {
+      ...fallbackState,
+      status: 'active',
+      phase: 'judging',
+      scores: { 'player-1': 0, 'player-2': 0 },
+      selectorParticipantId: 'player-1',
+    }
+
+    expect(restorePersistedGameState(inconsistentState, fallbackState)).toEqual(fallbackState)
+  })
+
+  it('rejects participant references absent from the session', () => {
+    const inconsistentState = {
+      ...fallbackState,
+      status: 'active',
+      phase: 'question',
+      scores: { 'player-1': 0, 'player-2': 0 },
+      selectorParticipantId: 'player-1',
+      activeQuestion: {
+        ...regularQuestion,
+        activeParticipantId: 'missing-player',
+      },
+    }
+
+    expect(restorePersistedGameState(inconsistentState, fallbackState)).toEqual(fallbackState)
   })
 
   it('migrates a version 1 session without losing scores or the round', () => {

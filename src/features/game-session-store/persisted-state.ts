@@ -185,6 +185,95 @@ export type ParticipantDraft = z.infer<typeof participantDraftSchema>
 export type PersistedGameState = z.infer<typeof persistedGameStateSchema>
 export type RuntimeSnapshot = z.infer<typeof runtimeSnapshotSchema>
 
+const QUESTION_PHASES = new Set<RuntimeSnapshot['phase']>([
+  'catSetup',
+  'auctionSetup',
+  'question',
+  'judging',
+  'answerReveal',
+])
+
+const FINAL_PHASES = new Set<RuntimeSnapshot['phase']>([
+  'finalThemeSelection',
+  'finalWager',
+  'finalQuestion',
+  'finalJudging',
+  'tieBreakerQuestion',
+  'tieBreakerJudging',
+  'results',
+])
+
+function hasKnownParticipantIds(ids: string[], participantIds: Set<string>) {
+  return ids.every((id) => participantIds.has(id))
+}
+
+function isRuntimeSnapshotCoherent(snapshot: RuntimeSnapshot, participantIds: Set<string>) {
+  const requiresQuestion = QUESTION_PHASES.has(snapshot.phase)
+  const requiresFinalState = FINAL_PHASES.has(snapshot.phase)
+
+  if (requiresQuestion !== Boolean(snapshot.activeQuestion)) return false
+  if (requiresFinalState !== Boolean(snapshot.finalState)) return false
+  if (snapshot.selectorParticipantId && !participantIds.has(snapshot.selectorParticipantId)) {
+    return false
+  }
+
+  if (!Object.keys(snapshot.scores).every((id) => participantIds.has(id))) return false
+  if (![...participantIds].every((id) => id in snapshot.scores)) return false
+
+  const question = snapshot.activeQuestion
+  if (question) {
+    if (!hasKnownParticipantIds(question.eligibleParticipantIds, participantIds)) return false
+    if (question.activeParticipantId && !participantIds.has(question.activeParticipantId)) {
+      return false
+    }
+    if (
+      !hasKnownParticipantIds(
+        question.attempts.map(({ participantId }) => participantId),
+        participantIds,
+      )
+    ) {
+      return false
+    }
+    if (snapshot.phase === 'catSetup' && question.type !== 'cat') return false
+    if (snapshot.phase === 'auctionSetup' && question.type !== 'auction') return false
+    if (snapshot.phase === 'question' && question.type !== 'regular') return false
+  }
+
+  const finalState = snapshot.finalState
+  if (finalState) {
+    const referencedParticipantIds = [
+      ...finalState.eligibleParticipantIds,
+      ...finalState.judgedParticipantIds,
+      ...finalState.tieParticipantIds,
+      ...finalState.winnerParticipantIds,
+      ...Object.keys(finalState.wagers),
+    ]
+    if (!hasKnownParticipantIds(referencedParticipantIds, participantIds)) return false
+  }
+
+  return true
+}
+
+function isPersistedStateCoherent(state: PersistedGameState) {
+  if (state.status === 'draft') {
+    return (
+      state.phase === 'setup' &&
+      state.activeQuestion === null &&
+      state.finalState === null &&
+      state.history.length === 0
+    )
+  }
+
+  const phase = state.phase
+  if (phase === 'setup') return false
+
+  const participantIds = new Set(state.participants.map(({ id }) => id))
+  return (
+    isRuntimeSnapshotCoherent({ ...state, phase }, participantIds) &&
+    state.history.every((snapshot) => isRuntimeSnapshotCoherent(snapshot, participantIds))
+  )
+}
+
 export function migratePersistedGameState(persistedState: unknown, version: number): unknown {
   if (version === 4) {
     const legacyState = legacyStateV4Schema.safeParse(persistedState)
@@ -271,7 +360,7 @@ export function restorePersistedGameState(
 ): PersistedGameState {
   const result = persistedGameStateSchema.safeParse(persistedState)
 
-  // localStorage может быть изменён вручную или содержать данные старой версии.
-  // Возврат к начальному состоянию безопаснее частичного восстановления партии.
-  return result.success ? result.data : fallbackState
+  // Одной проверки формы недостаточно: фаза вопроса без вопроса формально валидна,
+  // но после восстановления заблокирует UI. В таком случае безопаснее начать с fallback.
+  return result.success && isPersistedStateCoherent(result.data) ? result.data : fallbackState
 }
